@@ -1,5 +1,5 @@
 // VotingPlatform.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 
 declare global {
@@ -20,22 +20,14 @@ import {
 } from '@mui/material';
 import { ErrorBoundary } from './ErrorBoundary';
 import { pinProposalToIPFS } from '../utilities/ipfsUtils';
+import { CACHE_DURATION, PROPOSALS_PER_PAGE } from '../config/constants';
+import { CachedProposal, Proposal, VotingPlatformProps } from '../types/interfaces';
+import { Log } from 'ethers';
+import { useProposalBlocks } from '../utilities/proposalsCache';
+import { createPublicClient, http } from 'viem';
+import { hardhat } from 'viem/chains';
 
-// Interface for Proposal structure
-interface Proposal {
-  title: string;
-  description: string;
-  voteCount: number;
-  startTime: number;
-  endTime: number;
-  executed: boolean;
-}
 
-// Interface for component props
-interface VotingPlatformProps {
-  contractAddress: string;
-  contractABI: any;
-}
 
 export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) => {
   const [contract, setContract] = useState<ethers.Contract | null>(null);
@@ -43,6 +35,12 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [page, setPage] = useState(0);
+  const [publicClient] = useState(createPublicClient({
+    chain: hardhat,
+    transport: http()
+  }));
+
 
   // Form states
   const [newProposal, setNewProposal] = useState({
@@ -51,84 +49,85 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     startTime: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
   });
 
- // Connect to MetaMask
- const connectWallet = async () => {
-  try {
-    if (window.ethereum) {
-      const accounts = await window.ethereum.request({
-        method: 'eth_requestAccounts'
-      });
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const votingContract = new ethers.Contract(
-        contractAddress,
-        contractABI,
-        signer
-      );
-      
-      setAccount(accounts[0]);
-      setContract(votingContract);
-    } else {
-      setError('Please install MetaMask');
-    }
-  } catch (err) {
-    setError('Failed to connect wallet');
-    console.error(err);
-  }
-};
+  // Connect to MetaMask
+  const connectWallet = async () => {
+    try {
+      if (window.ethereum) {
+        const accounts = await window.ethereum.request({
+          method: 'eth_requestAccounts'
+        });
+        
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const votingContract = new ethers.Contract(
+          contractAddress,
+          contractABI,
+          signer
+        );
 
-// Fetch if client is a registered voter
-
-  useEffect(() => {
-    const fetchProposals = async () => {
-      if (!contract) return;
-
-      try {
-        setLoading(true);
-        // Convert BigInt to number safely
-        const count = await contract.proposalCount();
-        console.log("Count proposals",count);
-        const proposalCount = Number(count) || 0;
-        const fetchedProposals = [];
-
-        for (let i = 0; i < proposalCount; i++) {
-          try {
-            const proposal = await contract.proposals(BigInt(i));
-            if (!proposal) continue;
-
-            fetchedProposals.push({
-              title: proposal.title || '',
-              description: proposal.description || '',
-              voteCount: Number(proposal.voteCount) || 0,
-              startTime: Number(proposal.startTime) || 0,
-              endTime: Number(proposal.endTime) || 0,
-              executed: Boolean(proposal.executed)
-            });
-          } catch (proposalError) {
-            console.error(`Error fetching proposal ${i}:`, proposalError);
-            continue;
-          }
-        }
-
-        setProposals(fetchedProposals);
-      } catch (err) {
-        setError('Failed to fetch proposals');
-        console.error('Fetch error:', err);
-      } finally {
-        setLoading(false);
+        setAccount(accounts[0]);
+        setContract(votingContract);
+      } else {
+        setError('Please install MetaMask');
       }
-    };
+    } catch (err) {
+      setError('Failed to connect wallet');
+      console.error(err);
+    }
+  };
 
-    fetchProposals();
-  }, [contract]);
+  const fetchProposals = async () => {
+    if (!contract) return;
+  
+    try {
+      setLoading(true);
+      
+      // Get all ProposalCreated events
+      const filter = contract.filters.ProposalCreated()
+      const events = await contract.queryFilter(filter)
+      console.log(events);
+      
+      // Map through events to get proposal data
+      const proposals = await Promise.all(
+        events.map(async (event) => {
+          // Extract ipfsHash and title from event
+          const [ipfsHash, title, proposer] = event.args || []
+          
+          // Get proposal details from mapping using ipfsHash
+          const proposal = await contract.proposals(ipfsHash)
+          
+          return {
+            ipfsHash,
+            title: proposal.title,
+            votedYes: Number(proposal.votedYes),
+            votedNo: Number(proposal.votedNo),
+            endTime: Number(proposal.endTime),
+            executed: proposal.executed
+          }
+        })
+      )
+  
+      setProposals(proposals.filter(Boolean))
+    } catch (err) {
+      setError('Failed to fetch proposals')
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch proposals on component mount
+  useEffect(() => {
+    fetchProposals()
+  }, [contract, newProposal.title])
 
   // Create new proposal
   const createProposal = async () => {
     if (!contract || !account) return;
-    
+
     try {
       setLoading(true);
-      
+
       const metadata = {
         title: newProposal.title,
         description: newProposal.description,
@@ -136,25 +135,25 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         creator: account,
         timestamp: Math.floor(Date.now() / 1000)
       }
-      
+
       // Pin to IPFS first
       const ipfsHash = await pinProposalToIPFS(metadata)
-      
+
       // Store only hash on-chain
       const tx = await contract.createProposal(
         ipfsHash,
         newProposal.title,
         newProposal.startTime
       )
-      
-      await tx.wait(); 
-      
-      setNewProposal({ 
-        title: '', 
-        description: '', 
-        startTime: Math.floor(Date.now() / 1000) + 3600 
+
+      await tx.wait();
+
+      setNewProposal({
+        title: '',
+        description: '',
+        startTime: Math.floor(Date.now() / 1000) + 3600
       })
-      
+
     } catch (err) {
       setError('Failed to create proposal')
       console.error(err)
@@ -162,7 +161,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       setLoading(false)
     }
   }
-  
+
   // Cast vote
   const castVote = async (proposalId: number, support: boolean) => {
     if (!contract) return;
@@ -250,7 +249,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
               </Box>
             </CardContent>
           </Card>
-
           {/* Proposals List */}
           {proposals.map((proposal, index) => (
             <Card key={index} sx={{ mb: 2 }}>

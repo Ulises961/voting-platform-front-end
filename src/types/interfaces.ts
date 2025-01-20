@@ -8,17 +8,32 @@ export interface ProposalResponse {
   executed: boolean;
 }
 
-export interface CachedProposal {
+export interface CachedProposal extends Proposal {
   ipfsHash: string
   title: string
   votedYes: number
   votedNo: number
   endTime: number
   executed: boolean
-  lastUpdated: number
 }
 
-interface BlockRange {
+export interface BlockRange {
   fromBlock: bigint
   toBlock: bigint
+}
+
+// Interface for Proposal structure
+export interface Proposal {
+  ipfsHash: string
+  title: string
+  votedYes: number
+  votedNo: number
+  endTime: number
+  executed: boolean
+}
+
+// Interface for component props
+export interface VotingPlatformProps {
+  contractAddress: string;
+  contractABI: any;
 }

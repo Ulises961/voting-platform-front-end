@@ -21,22 +21,87 @@ export interface Voter {
 
 // Simplified ABI with only needed functions
 export const CONTRACT_ABI = [
-  // Read functions
-  'function voters(address) view returns (bool isRegistered, uint256 votingPower, uint256 lastVoteTime)',
-  'function proposals(uint256) view returns (string proposalHash, string ipfsHash, string title, uint256 voteCount, uint256 startTime, uint256 endTime, bool executed)',
-  'function proposalCount() view returns (uint256)',
-  'function isAdmin(address) view returns (bool)',
-  
-  // Write functions
-  'function registerVoter(address _voter)',
-  'function createProposal(string _ipfsHash, string _title, uint256 _startTime) returns (uint256)',
-  'function castVote(string  _ipfsHash, bool _support)',
+   // Constructor
+   {
+    inputs: [{ internalType: "uint256", name: "_votingPeriod", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "constructor"
+  },
   
   // Events
-  'event VoterRegistered(address indexed voter)',
-  'event ProposalCreated(uint256 indexed proposalId, string title, address proposer)',
-  'event VoteCast(uint256 indexed proposalId, address indexed voter, bool support)'
-] as const
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "approver", type: "address" },
+      { indexed: true, internalType: "address", name: "newAdmin", type: "address" }
+    ],
+    name: "AdminApproved",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "string", name: "ipfsHash", type: "string" },
+      { indexed: false, internalType: "string", name: "title", type: "string" },
+      { indexed: false, internalType: "address", name: "proposer", type: "address" }
+    ],
+    name: "ProposalCreated",
+    type: "event"
+  },
+  
+  // Read functions
+  {
+    inputs: [{ internalType: "address", name: "_account", type: "address" }],
+    name: "isAdmin",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "string", name: "", type: "string" }],
+    name: "proposals",
+    outputs: [
+      { internalType: "string", name: "ipfsHash", type: "string" },
+      { internalType: "string", name: "title", type: "string" },
+      { internalType: "uint256", name: "votedYes", type: "uint256" },
+      { internalType: "uint256", name: "votedNo", type: "uint256" },
+      { internalType: "uint256", name: "endTime", type: "uint256" },
+      { internalType: "bool", name: "executed", type: "bool" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  
+  // Write functions
+  {
+    inputs: [
+      { internalType: "string", name: "_ipfsHash", type: "string" },
+      { internalType: "string", name: "title", type: "string" },
+      { internalType: "uint256", name: "_startTime", type: "uint256" }
+    ],
+    name: "createProposal",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "address", name: "_voter", type: "address" }],
+    name: "registerVoter",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [
+      { internalType: "string", name: "_ipfsHash", type: "string" },
+      { internalType: "bool", name: "_support", type: "bool" }
+    ],
+    name: "castVote",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  }
+] as const;
 
 // Export contract config
 export const VOTING_PLATFORM = {
