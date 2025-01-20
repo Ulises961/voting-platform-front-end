@@ -71,7 +71,27 @@ export const CONTRACT_ABI = [
     stateMutability: "view",
     type: "function"
   },
-  
+  {
+    "inputs": [],
+    "name": "getAllProposals",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "string", "name": "ipfsHash", "type": "string" },
+          { "internalType": "string", "name": "title", "type": "string" },
+          { "internalType": "uint256", "name": "votedYes", "type": "uint256" },
+          { "internalType": "uint256", "name": "votedNo", "type": "uint256" },
+          { "internalType": "uint256", "name": "endTime", "type": "uint256" },
+          { "internalType": "bool", "name": "executed", "type": "bool" }
+        ],
+        "internalType": "struct Proposal[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
   // Write functions
   {
     inputs: [

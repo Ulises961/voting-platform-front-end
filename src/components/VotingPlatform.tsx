@@ -82,32 +82,17 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     try {
       setLoading(true);
       
-      // Get all ProposalCreated events
-      const filter = contract.filters.ProposalCreated()
-      const events = await contract.queryFilter(filter)
-      console.log(events);
-      
-      // Map through events to get proposal data
-      const proposals = await Promise.all(
-        events.map(async (event) => {
-          // Extract ipfsHash and title from event
-          const [ipfsHash, title, proposer] = event.args || []
-          
-          // Get proposal details from mapping using ipfsHash
-          const proposal = await contract.proposals(ipfsHash)
-          
-          return {
-            ipfsHash,
-            title: proposal.title,
-            votedYes: Number(proposal.votedYes),
-            votedNo: Number(proposal.votedNo),
-            endTime: Number(proposal.endTime),
-            executed: proposal.executed
-          }
-        })
-      )
+      const proposalsArray = await contract.getAllProposals();
+      const formattedProposals = proposalsArray.map((proposal: any) => ({
+        ipfsHash: proposal.ipfsHash,
+          title: proposal.title,
+          votedYes: parseInt(proposal.votedYes.toString(), 10),
+          votedNo: parseInt(proposal.votedNo.toString(), 10),
+          endTime: proposal.endTime, // Convert timestamp to human-readable format
+          executed: proposal.executed,
+        }));
   
-      setProposals(proposals.filter(Boolean))
+      setProposals(formattedProposals);
     } catch (err) {
       setError('Failed to fetch proposals')
       console.error(err)
@@ -255,7 +240,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
               <CardContent>
                 <Typography variant="h6">{proposal.title}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {proposal.description}
+                  {proposal.title}
                 </Typography>
                 <Box sx={{ mt: 2 }}>
                   <Button
