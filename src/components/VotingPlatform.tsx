@@ -439,10 +439,12 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                 </Paper>
               </>
             ) : (
-              <LoginForm 
-                onLogin={handleLogin} 
-                checkRegistration={checkRegistration}
-              />
+              <div style={{ backgroundColor: 'white', padding: '20px' }}>
+                <LoginForm 
+                  onLogin={handleLogin} 
+                  checkRegistration={checkRegistration}
+                />
+              </div>
             )}
           </>
         )}
