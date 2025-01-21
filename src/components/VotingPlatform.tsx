@@ -240,7 +240,11 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
               <CardContent>
                 <Typography variant="h6">{proposal.title}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {proposal.title}
+                    <strong>Title:</strong> {proposal.title} <br />
+                    <strong>Votes For:</strong> {proposal.votedYes} <br />
+                    <strong>Votes Against:</strong> {proposal.votedNo} <br />
+                    <strong>End Time:</strong> {new Date(proposal.endTime * 1000).toLocaleString()} <br />
+                    <strong>Executed:</strong> {proposal.executed ? 'Yes' : 'No'}
                 </Typography>
                 <Box sx={{ mt: 2 }}>
                   <Button
