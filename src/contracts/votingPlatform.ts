@@ -51,6 +51,15 @@ export const CONTRACT_ABI = [
   
   // Read functions
   {
+    inputs: [
+      { internalType: "string", name: "_domain", type: "string" }
+    ],
+    name: "isVoterRegistered",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
     inputs: [{ internalType: "address", name: "_account", type: "address" }],
     name: "isAdmin",
     outputs: [{ internalType: "bool", name: "", type: "bool" }],
@@ -97,13 +106,15 @@ export const CONTRACT_ABI = [
     inputs: [
       { internalType: "string", name: "_ipfsHash", type: "string" },
       { internalType: "string", name: "title", type: "string" },
-      { internalType: "uint256", name: "_startTime", type: "uint256" }
+      { internalType: "uint256", name: "_startTime", type: "uint256" },
+      { internalType: "string[]", name: "_allowedDomains", type: "string[]" }
     ],
     name: "createProposal",
-    outputs: [],
+    outputs: [{ internalType: "string", name: "", type: "string" }],
     stateMutability: "nonpayable",
     type: "function"
   },
+
   {
     inputs: [{ internalType: "address", name: "_voter", type: "address" }],
     name: "registerVoter",
@@ -120,7 +131,18 @@ export const CONTRACT_ABI = [
     outputs: [],
     stateMutability: "nonpayable",
     type: "function"
+  },
+  {
+    inputs: [
+      { internalType: "string", name: "_domain", type: "string" }
+    ],
+    name: "registerWithDomain",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
   }
+
+
 ] as const;
 
 // Export contract config

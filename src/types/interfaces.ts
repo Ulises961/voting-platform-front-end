@@ -7,6 +7,11 @@ export interface ProposalResponse {
   endTime: bigint;
   executed: boolean;
 }
+interface LoginFormProps {
+  onLogin: (email: string, isRegistering: boolean) => void;
+  checkRegistration: (domain: string) => Promise<boolean>;
+}
+
 
 export interface CachedProposal extends Proposal {
   ipfsHash: string
