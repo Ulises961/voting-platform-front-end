@@ -23,6 +23,7 @@ import {
   ListItem,
   ListItemText
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { ErrorBoundary } from './ErrorBoundary';
 import { pinProposalToIPFS } from '../utilities/ipfsUtils';
 import { CACHE_DURATION, PROPOSALS_PER_PAGE } from '../config/constants';
@@ -391,7 +392,15 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                     </CardContent>
                   </Card>
                 </Paper>
-                
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Button 
+            variant="outlined"
+            onClick={fetchProposals}
+            disabled={loading}
+          >
+            Refresh Proposals
+          </Button>
+        </Box>
                 {/* Proposals List */}
                 <Paper sx={{ p: 2 }}>
                   {proposals.map((proposal, index) => (
