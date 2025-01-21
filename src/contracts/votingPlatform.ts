@@ -21,87 +21,53 @@ export interface Voter {
 
 // Simplified ABI with only needed functions
 export const CONTRACT_ABI = [
-   // Constructor
-   {
-    inputs: [{ internalType: "uint256", name: "_votingPeriod", type: "uint256" }],
-    stateMutability: "nonpayable",
-    type: "constructor"
-  },
-  
-  // Events
+  // Admin Management
   {
-    anonymous: false,
-    inputs: [
-      { indexed: true, internalType: "address", name: "approver", type: "address" },
-      { indexed: true, internalType: "address", name: "newAdmin", type: "address" }
-    ],
-    name: "AdminApproved",
-    type: "event"
-  },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, internalType: "string", name: "ipfsHash", type: "string" },
-      { indexed: false, internalType: "string", name: "title", type: "string" },
-      { indexed: false, internalType: "address", name: "proposer", type: "address" }
-    ],
-    name: "ProposalCreated",
-    type: "event"
-  },
-  
-  // Read functions
-  {
-    inputs: [
-      { internalType: "string", name: "_domain", type: "string" }
-    ],
-    name: "isVoterRegistered",
+    inputs: [{ internalType: "address", name: "_account", type: "address" }],
+    name: "admins",
     outputs: [{ internalType: "bool", name: "", type: "bool" }],
     stateMutability: "view",
     type: "function"
   },
   {
-    inputs: [{ internalType: "address", name: "_account", type: "address" }],
-    name: "isAdmin",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    inputs: [{ internalType: "address", name: "_proposedAdmin", type: "address" }],
+    name: "proposeAdmin",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [{ internalType: "address", name: "_proposedAdmin", type: "address" }],
+    name: "approveAdmin",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  
+  // Domain Management
+  {
+    inputs: [{ internalType: "string", name: "_domain", type: "string" }],
+    name: "addDomain",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "getDomains",
+    outputs: [{ internalType: "string[]", name: "", type: "string[]" }],
     stateMutability: "view",
     type: "function"
   },
   {
     inputs: [{ internalType: "string", name: "", type: "string" }],
-    name: "proposals",
-    outputs: [
-      { internalType: "string", name: "ipfsHash", type: "string" },
-      { internalType: "string", name: "title", type: "string" },
-      { internalType: "uint256", name: "votedYes", type: "uint256" },
-      { internalType: "uint256", name: "votedNo", type: "uint256" },
-      { internalType: "uint256", name: "endTime", type: "uint256" },
-      { internalType: "bool", name: "executed", type: "bool" }
-    ],
+    name: "approvedDomains",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
     stateMutability: "view",
     type: "function"
   },
-  {
-    "inputs": [],
-    "name": "getAllProposals",
-    "outputs": [
-      {
-        "components": [
-          { "internalType": "string", "name": "ipfsHash", "type": "string" },
-          { "internalType": "string", "name": "title", "type": "string" },
-          { "internalType": "uint256", "name": "votedYes", "type": "uint256" },
-          { "internalType": "uint256", "name": "votedNo", "type": "uint256" },
-          { "internalType": "uint256", "name": "endTime", "type": "uint256" },
-          { "internalType": "bool", "name": "executed", "type": "bool" }
-        ],
-        "internalType": "struct Proposal[]",
-        "name": "",
-        "type": "tuple[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  // Write functions
+  
+  // Proposal Management
   {
     inputs: [
       { internalType: "string", name: "_ipfsHash", type: "string" },
@@ -114,35 +80,70 @@ export const CONTRACT_ABI = [
     stateMutability: "nonpayable",
     type: "function"
   },
-
   {
-    inputs: [{ internalType: "address", name: "_voter", type: "address" }],
-    name: "registerVoter",
-    outputs: [],
-    stateMutability: "nonpayable",
+    inputs: [],
+    name: "getAllProposals",
+    outputs: [{
+      components: [
+        { internalType: "string", name: "ipfsHash", type: "string" },
+        { internalType: "string", name: "title", type: "string" },
+        { internalType: "uint256", name: "votedYes", type: "uint256" },
+        { internalType: "uint256", name: "votedNo", type: "uint256" },
+        { internalType: "uint256", name: "endTime", type: "uint256" },
+        { internalType: "bool", name: "executed", type: "bool" },
+        { internalType: "string[]", name: "allowedDomains", type: "string[]" }
+      ],
+      internalType: "struct VotingPlatform.Proposal[]",
+      name: "",
+      type: "tuple[]"
+    }],
+    stateMutability: "view",
     type: "function"
   },
+  
+  // Voter Management
   {
-    inputs: [
-      { internalType: "string", name: "_ipfsHash", type: "string" },
-      { internalType: "bool", name: "_support", type: "bool" }
-    ],
-    name: "castVote",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function"
-  },
-  {
-    inputs: [
-      { internalType: "string", name: "_domain", type: "string" }
-    ],
+    inputs: [{ internalType: "string", name: "_domain", type: "string" }],
     name: "registerWithDomain",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function"
+  },
+  {
+    inputs: [{ internalType: "string", name: "_domain", type: "string" }],
+    name: "isVoterRegistered",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  
+  // Events
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "string", name: "domain", type: "string" }
+    ],
+    name: "DomainAdded",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "voter", type: "address" }
+    ],
+    name: "VoterRegistered",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "string", name: "ipfsHash", type: "string" },
+      { indexed: false, internalType: "string", name: "title", type: "string" },
+      { indexed: false, internalType: "address", name: "proposer", type: "address" }
+    ],
+    name: "ProposalCreated",
+    type: "event"
   }
-
-
 ] as const;
 
 // Export contract config

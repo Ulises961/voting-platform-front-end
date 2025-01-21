@@ -18,7 +18,10 @@ import {
   Alert,
   CircularProgress,
   Paper,
-  LinearProgress
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemText
 } from '@mui/material';
 import { ErrorBoundary } from './ErrorBoundary';
 import { pinProposalToIPFS } from '../utilities/ipfsUtils';
@@ -45,6 +48,9 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   }));
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [approvedDomains, setApprovedDomains] = useState<string[]>([]);
+  const [newDomain, setNewDomain] = useState('');
 
   // Form states
   const [newProposal, setNewProposal] = useState({
@@ -218,6 +224,48 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   };
 
+  // Add admin check
+  const checkAdminStatus = async () => {
+    if (!contract || !account) return;
+    try {
+        const isAdminResult = await contract.admins(account);
+        console.log('isAdminResult:', isAdminResult);
+        setIsAdmin(isAdminResult);
+    } catch (err) {
+        console.error('Error checking admin:', err);
+    }
+  };
+
+  // Add domain management for admins
+  const addDomain = async (domain: string) => {
+    if (!contract || !isAdmin) return;
+    try {
+        const tx = await contract.addDomain(domain);
+        await tx.wait();
+        console.log('Domain added:', domain);
+        fetchApprovedDomains();
+    } catch (err) {
+        setError('Failed to add domain');
+    }
+  };
+
+  const fetchApprovedDomains = async () => {
+    if (!contract) return;
+    try {
+        const domains = await contract.getDomains();
+        setApprovedDomains(domains);
+    } catch (err) {
+        console.error('Error fetching domains:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (contract && account) {
+        checkAdminStatus();
+        fetchApprovedDomains();
+    }
+  }, [contract, account]);
+
   return (
     <ErrorBoundary>
       <Container>
@@ -235,118 +283,158 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
               Connect Wallet
             </Button>
           </Box>
-        ) : !isLoggedIn ? (
-        // Step 2: Email Login with registration check
-        <LoginForm 
-          onLogin={handleLogin} 
-          checkRegistration={checkRegistration}
-        />
-      ) : (
-          // Step 3: Main App Content
+        ) : (
           <>
-            <Typography variant="subtitle1" sx={{ mb: 2 }}>
-              Connected: {account}
-            </Typography>
-            <Typography variant="subtitle2" sx={{ mb: 2 }}>
-              Email: {userEmail}
-            </Typography>
-            
-            {/* Proposal Creation Form */}
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Card sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Create New Proposal
-                  </Typography>
-                  <Box component="form" sx={{ '& > *': { mb: 2 } }}>
-                    <TextField
-                      fullWidth
-                      label="Title"
-                      value={newProposal.title}
-                      onChange={(e) => setNewProposal({
-                        ...newProposal,
-                        title: e.target.value
-                      })}
-                    />
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={4}
-                      label="Description"
-                      value={newProposal.description}
-                      onChange={(e) => setNewProposal({
-                        ...newProposal,
-                        description: e.target.value
-                      })}
-                    />
-                    <TextField
-                      type="datetime-local"
-                      label="Start Time"
-                      value={new Date(newProposal.startTime * 1000).toISOString().slice(0, 16)}
-                      onChange={(e) => setNewProposal({
-                        ...newProposal,
-                        startTime: Math.floor(new Date(e.target.value).getTime() / 1000)
-                      })}
-                      fullWidth
-                    />
-                    <TextField
-                      fullWidth
-                      label="Allowed Domains (comma-separated) leave empty to use your email domain"
-                      value={newProposal.allowedDomains.join(',')}
-                      onChange={(e) => setNewProposal({
-                        ...newProposal,
-                        allowedDomains: e.target.value.split(',').map(d => d.trim()).filter(d => d)
-                      })}
-                      helperText="Enter email domains that can vote, e.g.: gmail.com,yahoo.com"
-                    />
-                    <Button
-                      variant="contained"
-                      onClick={createProposal}
-                      disabled={loading || !account}
-                    >
-                      {loading ? <CircularProgress size={24} /> : 'Create Proposal'}
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Paper>
-            
-            {/* Proposals List */}
-            <Paper sx={{ p: 2 }}>
-              {proposals.map((proposal, index) => (
-                <Card key={index} sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Typography variant="h6">{proposal.title}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        <strong>Title:</strong> {proposal.title} <br />
-                        <strong>Votes For:</strong> {proposal.votedYes} <br />
-                        <strong>Votes Against:</strong> {proposal.votedNo} <br />
-            
-                        <strong>Executed:</strong> {proposal.executed ? 'Yes' : 'No'}
-                    </Typography>
-                    <Box sx={{ mt: 2 }}>
-                      <Button
-                        variant="contained"
-                        color="success"
-                        onClick={() => castVote(index, true)}
-                        disabled={loading}
-                        sx={{ mr: 1 }}
-                      >
-                        Vote For
-                      </Button>
-                      <Button
-                        variant="contained"
-                        color="error"
-                        onClick={() => castVote(index, false)}
-                        disabled={loading}
-                      >
-                        Vote Against
-                      </Button>
-                    </Box>
-                  </CardContent>
-                </Card>
-              ))}
-            </Paper>
+            {/* Admin Panel */}
+            {isAdmin && (
+              <Paper sx={{ p: 2, mb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Admin Panel
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <TextField
+                    label="New Domain"
+                    value={newDomain}
+                    onChange={(e) => setNewDomain(e.target.value)}
+                    placeholder="e.g. gmail.com"
+                  />
+                  <Button 
+                    variant="contained" 
+                    onClick={() => {
+                      addDomain(newDomain);
+                      setNewDomain('');
+                    }}
+                    disabled={!newDomain || loading}
+                  >
+                    Add Domain
+                  </Button>
+                </Box>
+                
+                <Typography variant="subtitle2">
+                  Approved Domains:
+                </Typography>
+                <List>
+                  {approvedDomains.map((domain, index) => (
+                    <ListItem key={index}>
+                      <ListItemText primary={domain} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Paper>
+            )}
+
+            {isLoggedIn ? (
+              <>
+                <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                  Connected: {account}
+                </Typography>
+                <Typography variant="subtitle2" sx={{ mb: 2 }}>
+                  Email: {userEmail}
+                </Typography>
+                
+                {/* Proposal Creation Form */}
+                <Paper sx={{ p: 2, mb: 2 }}>
+                  <Card sx={{ mb: 2 }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Create New Proposal
+                      </Typography>
+                      <Box component="form" sx={{ '& > *': { mb: 2 } }}>
+                        <TextField
+                          fullWidth
+                          label="Title"
+                          value={newProposal.title}
+                          onChange={(e) => setNewProposal({
+                            ...newProposal,
+                            title: e.target.value
+                          })}
+                        />
+                        <TextField
+                          fullWidth
+                          multiline
+                          rows={4}
+                          label="Description"
+                          value={newProposal.description}
+                          onChange={(e) => setNewProposal({
+                            ...newProposal,
+                            description: e.target.value
+                          })}
+                        />
+                        <TextField
+                          type="datetime-local"
+                          label="Start Time"
+                          value={new Date(newProposal.startTime * 1000).toISOString().slice(0, 16)}
+                          onChange={(e) => setNewProposal({
+                            ...newProposal,
+                            startTime: Math.floor(new Date(e.target.value).getTime() / 1000)
+                          })}
+                          fullWidth
+                        />
+                        <TextField
+                          fullWidth
+                          label="Allowed Domains (comma-separated) leave empty to use your email domain"
+                          value={newProposal.allowedDomains.join(',')}
+                          onChange={(e) => setNewProposal({
+                            ...newProposal,
+                            allowedDomains: e.target.value.split(',').map(d => d.trim()).filter(d => d)
+                          })}
+                          helperText="Enter email domains that can vote, e.g.: gmail.com,yahoo.com"
+                        />
+                        <Button
+                          variant="contained"
+                          onClick={createProposal}
+                          disabled={loading || !account}
+                        >
+                          {loading ? <CircularProgress size={24} /> : 'Create Proposal'}
+                        </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Paper>
+                
+                {/* Proposals List */}
+                <Paper sx={{ p: 2 }}>
+                  {proposals.map((proposal, index) => (
+                    <Card key={index} sx={{ mb: 2 }}>
+                      <CardContent>
+                        <Typography variant="h6">{proposal.title}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            <strong>Title:</strong> {proposal.title} <br />
+                            <strong>Votes For:</strong> {proposal.votedYes} <br />
+                            <strong>Votes Against:</strong> {proposal.votedNo} <br />
+                
+                            <strong>Executed:</strong> {proposal.executed ? 'Yes' : 'No'}
+                        </Typography>
+                        <Box sx={{ mt: 2 }}>
+                          <Button
+                            variant="contained"
+                            color="success"
+                            onClick={() => castVote(index, true)}
+                            disabled={loading}
+                            sx={{ mr: 1 }}
+                          >
+                            Vote For
+                          </Button>
+                          <Button
+                            variant="contained"
+                            color="error"
+                            onClick={() => castVote(index, false)}
+                            disabled={loading}
+                          >
+                            Vote Against
+                          </Button>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Paper>
+              </>
+            ) : (
+              <LoginForm 
+                onLogin={handleLogin} 
+                checkRegistration={checkRegistration}
+              />
+            )}
           </>
         )}
         
