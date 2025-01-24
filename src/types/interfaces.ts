@@ -7,7 +7,7 @@ export interface ProposalResponse {
   endTime: bigint;
   executed: boolean;
 }
-interface LoginFormProps {
+export interface LoginFormProps {
   onLogin: (email: string, isRegistering: boolean) => void;
   checkRegistration: (domain: string) => Promise<boolean>;
 }

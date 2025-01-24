@@ -58,7 +58,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     title: '',
     description: '',
     startTime: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
-    allowedDomains: [''] // Add allowed domains array
   });
 
   // Connect to MetaMask
@@ -103,7 +102,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
           endTime: proposal.endTime, // Convert timestamp to human-readable format
           executed: proposal.executed,
         }));
-  
+      fetchPinataProposals(formattedProposals);
       setProposals(formattedProposals);
     } catch (err) {
       setError('Failed to fetch proposals')
@@ -370,16 +369,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                             startTime: Math.floor(new Date(e.target.value).getTime() / 1000)
                           })}
                           fullWidth
-                        />
-                        <TextField
-                          fullWidth
-                          label="Allowed Domains (comma-separated) leave empty to use your email domain"
-                          value={newProposal.allowedDomains.join(',')}
-                          onChange={(e) => setNewProposal({
-                            ...newProposal,
-                            allowedDomains: e.target.value.split(',').map(d => d.trim()).filter(d => d)
-                          })}
-                          helperText="Enter email domains that can vote, e.g.: gmail.com,yahoo.com"
                         />
                         <Button
                           variant="contained"
