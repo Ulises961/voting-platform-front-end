@@ -21,6 +21,6 @@ export const IPFS_CONFIG = {
   jwt: PINATA_JWT
 } as const
 
-
+export const OAUTH_CLIENT_ID = ''
 export const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 export const PROPOSALS_PER_PAGE = 10

@@ -2,21 +2,18 @@ import { CONTRACT_ADDRESS } from "../config/constants"
 
 // Types for frontend use
 export interface Proposal {
-  id: number
-  title: string
-  description: string
-  voteCount: bigint
-  startTime: bigint
-  endTime: bigint
-  executed: boolean
-  proposalHash: string
-  ipfsHash: string
+  ipfsHash: string;
+  title: string;
+  votedYes: bigint;
+  votedNo: bigint;
+  endTime: bigint;
+  executed: boolean;
+  domain: string;
 }
 
 export interface Voter {
-  isRegistered: boolean
-  votingPower: bigint
-  lastVoteTime: bigint
+  votingPower: bigint;
+  emailDomain: string;
 }
 
 // Simplified ABI with only needed functions
@@ -53,6 +50,17 @@ export const CONTRACT_ABI = [
     type: "function"
   },
   {
+    inputs: [
+      { internalType: "string", name: "_domain", type: "string" }
+    ],
+    name: "isDomainRegistered",
+    outputs: [
+      { internalType: "bool", name: "", type: "bool" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
     inputs: [],
     name: "getDomains",
     outputs: [{ internalType: "string[]", name: "", type: "string[]" }],
@@ -71,9 +79,8 @@ export const CONTRACT_ABI = [
   {
     inputs: [
       { internalType: "string", name: "_ipfsHash", type: "string" },
-      { internalType: "string", name: "title", type: "string" },
-      { internalType: "uint256", name: "_startTime", type: "uint256" },
-      { internalType: "string[]", name: "_allowedDomains", type: "string[]" }
+      { internalType: "string", name: "_title", type: "string" },
+      { internalType: "uint256", name: "_startTime", type: "uint256" }
     ],
     name: "createProposal",
     outputs: [{ internalType: "string", name: "", type: "string" }],
@@ -91,13 +98,23 @@ export const CONTRACT_ABI = [
         { internalType: "uint256", name: "votedNo", type: "uint256" },
         { internalType: "uint256", name: "endTime", type: "uint256" },
         { internalType: "bool", name: "executed", type: "bool" },
-        { internalType: "string[]", name: "allowedDomains", type: "string[]" }
+        { internalType: "string", name: "domain", type: "string" }
       ],
       internalType: "struct VotingPlatform.Proposal[]",
       name: "",
       type: "tuple[]"
     }],
     stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [
+      { internalType: "string", name: "_ipfsHash", type: "string" },
+      { internalType: "bool", name: "_support", type: "bool" }
+    ],
+    name: "castVote",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function"
   },
   
@@ -113,6 +130,38 @@ export const CONTRACT_ABI = [
     inputs: [{ internalType: "string", name: "_domain", type: "string" }],
     name: "isVoterRegistered",
     outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function"
+  },
+
+  // Token Claimer
+  {
+    inputs: [
+      { internalType: "string", name: "kid", type: "string" },
+      { internalType: "bytes", name: "modulus", type: "bytes" }
+    ],
+    name: "addModulus",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "getAllModuli",
+    outputs: [
+      { internalType: "bytes[]", name: "", type: "bytes[]" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [
+      { internalType: "string", name: "kid", type: "string" }
+    ],
+    name: "getModulus",
+    outputs: [
+      { internalType: "bytes", name: "", type: "bytes" }
+    ],
     stateMutability: "view",
     type: "function"
   },
@@ -142,6 +191,16 @@ export const CONTRACT_ABI = [
       { indexed: false, internalType: "address", name: "proposer", type: "address" }
     ],
     name: "ProposalCreated",
+    type: "event"
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "string", name: "ipfsHash", type: "string" },
+      { indexed: true, internalType: "address", name: "voter", type: "address" },
+      { indexed: false, internalType: "bool", name: "support", type: "bool" }
+    ],
+    name: "VoteCast",
     type: "event"
   }
 ] as const;

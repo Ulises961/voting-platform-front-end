@@ -1,7 +1,10 @@
 // VotingPlatform.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-
+import { Base64 } from 'js-base64';
+import {Buffer} from 'buffer';
+import { GoogleLogin } from "@react-oauth/google"
+import { GoogleOAuthProvider } from '@react-oauth/google';
 declare global {
   interface Window {
     ethereum?: any;
@@ -21,19 +24,20 @@ import {
   LinearProgress,
   List,
   ListItem,
-  ListItemText
+  ListItemText,
 } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import { ErrorBoundary } from './ErrorBoundary';
 import { pinProposalToIPFS } from '../utilities/ipfsUtils';
 import { CACHE_DURATION, PROPOSALS_PER_PAGE } from '../config/constants';
-import { CachedProposal, Proposal, VotingPlatformProps } from '../types/interfaces';
+import { CachedProposal, JWT, Proposal, VotingPlatformProps } from '../types/interfaces';
 import { Log } from 'ethers';
 import { useProposalBlocks } from '../utilities/proposalsCache';
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, Hex, http } from 'viem';
 import { hardhat } from 'viem/chains';
 import { LoginForm } from './LoginForm';
-
+import { useQuery } from "@tanstack/react-query"
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { parse } from 'path';
 
 
 export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) => {
@@ -53,12 +57,25 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   const [approvedDomains, setApprovedDomains] = useState<string[]>([]);
   const [newDomain, setNewDomain] = useState('');
 
+  const [requiresUpdate, setRequiresUpdate] = useState<JWT[]>([])
+  const [jwt, setJWT] = useState<string | undefined>(undefined)
+
   // Form states
   const [newProposal, setNewProposal] = useState({
     title: '',
     description: '',
     startTime: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
   });
+
+  const { data: latestSigners } = useQuery({
+    queryKey: ["googlejwt"],
+    queryFn: async () => {
+      return fetch("https://www.googleapis.com/oauth2/v3/certs")
+        .then((response) => response.json())
+        .then((data) => data as { keys: JWT[] })
+    },
+  })
+  console.log(latestSigners)
 
   // Connect to MetaMask
   const connectWallet = async () => {
@@ -102,7 +119,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
           endTime: proposal.endTime, // Convert timestamp to human-readable format
           executed: proposal.executed,
         }));
-      fetchPinataProposals(formattedProposals);
+      //fetchPinataProposals(formattedProposals); TODO: Implement this function
       setProposals(formattedProposals);
     } catch (err) {
       setError('Failed to fetch proposals')
@@ -112,10 +129,69 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   }
 
+  const updateModuli = async () => {
+    if (!contract || !latestSigners) {
+      return
+    }
+    try {
+      setLoading(true)
+      for (const jwt of requiresUpdate) {
+        const modulus = jwt.n;
+        const parsed = base64UrlToHex(modulus)
+        const tx = await contract.addModulus(jwt.kid, parsed)
+        await tx.wait()
+      }
+      setRequiresUpdate([])
+      //await fetchProposals()
+    } catch (err) {
+      setError('Failed to update moduli')
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function parseJwt(token: string) {
+    return {
+      header: Buffer.from(token.split(".")[0], "base64").toString(),
+      payload: Buffer.from(token.split(".")[1], "base64").toString(),
+      hexSig: ("0x" +
+        Buffer.from(token.split(".")[2], "base64").toString("hex")) as Hex,
+    }
+  }
+
+  const base64UrlToHex = (n: string): `0x${string}` => {
+    const bytes = Base64.toUint8Array(n.replace(/-/g, '+').replace(/_/g, '/'));
+    return `0x${Array.from<number>(bytes).map(b => b.toString(16).padStart(2, '0')).join('')}`;
+  };
+
+  const getRequiresUpdate = async () => {
+    if (!contract || !latestSigners) {
+      return
+    }
+    console.log("Getting requires update")
+    const updatesRequired: JWT[] = []
+    const currentModuli = await contract.getAllModuli();
+    for (const jwt of latestSigners.keys) {
+      const modulus = jwt.n;
+      const parsed = base64UrlToHex(modulus)
+      console.log("Checking modulus:", parsed)
+      if (!currentModuli.includes(parsed)) {
+        updatesRequired.push(jwt)
+      }else{
+        console.log("Modulus already exists: ", currentModuli.includes(parsed))
+      }
+    }
+    setRequiresUpdate(updatesRequired)
+  }
+
+
+
   // Fetch proposals on component mount
   useEffect(() => {
     fetchProposals()
-  }, [contract, newProposal.title])
+    getRequiresUpdate().catch(console.error)
+  }, [contract, newProposal.title, latestSigners])
 
   // Create new proposal
   const createProposal = async () => {
@@ -124,40 +200,24 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     try {
       setLoading(true);
   
-      // Use logged in domain if allowedDomains is empty
-      let domains = newProposal.allowedDomains;
-      if (domains.length === 0 || (domains.length === 1 && domains[0] === '')) {
-        const userDomain = userEmail.split('@')[1];
-        domains = [userDomain];
-      }
-  
       const metadata = {
         title: newProposal.title,
         description: newProposal.description,
         startTime: newProposal.startTime,
         creator: account,
-        timestamp: Math.floor(Date.now() / 1000),
-        allowedDomains: domains
-      }
+        timestamp: Math.floor(Date.now() / 1000)
+      };
   
       const ipfsHash = await pinProposalToIPFS(metadata);
   
       const tx = await contract.createProposal(
         ipfsHash,
         newProposal.title,
-        newProposal.startTime,
-        domains
+        newProposal.startTime
       );
   
       await tx.wait();
-  
-      setNewProposal({
-        title: '',
-        description: '',
-        startTime: Math.floor(Date.now() / 1000) + 3600,
-        allowedDomains: ['']
-      });
-  
+      await fetchProposals();
     } catch (err) {
       setError('Failed to create proposal');
       console.error(err);
@@ -165,9 +225,10 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       setLoading(false);
     }
   };
+  
 
   // Cast vote
-  const castVote = async (proposalId: number, support: boolean) => {
+  const castVote = async (proposalId: string, support: boolean) => {
     if (!contract) return;
 
     try {
@@ -185,7 +246,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   const checkRegistration = async (domain: string) => {
     if (!contract || !account) return false;
     try {
-      const isRegistered = await contract.isVoterRegistered(domain);
+      const isRegistered = await contract.isDomainRegistered(domain);
       return isRegistered;
     } catch (err) {
       console.error('Error checking registration:', err);
@@ -207,10 +268,10 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         const tx = await contract.registerWithDomain(domain);
         await tx.wait();
       } else {
-        const isRegistered = await contract.isVoterRegistered(domain);
-        if (!isRegistered) {
-          throw new Error('Domain not registered for this wallet');
-        }
+        // const isRegistered = await contract.isVoterRegistered(domain);
+        // if (!isRegistered) {
+        //   throw new Error('Domain not registered for this wallet');
+        // }
       }
       
       setUserEmail(email);
@@ -267,189 +328,222 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   }, [contract, account]);
 
   return (
-    <ErrorBoundary>
-      <Container>
-        {!account ? (
-          // Step 1: Wallet Connection
-          <Box sx={{ textAlign: 'center', my: 4 }}>
-            <Typography variant="h6" gutterBottom>
-              Please connect your wallet to continue
-            </Typography>
-            <Button 
-              variant="contained" 
-              onClick={connectWallet}
-              disabled={loading}
-            >
-              Connect Wallet
-            </Button>
-          </Box>
-        ) : (
-          <>
-            {/* Admin Panel */}
-            {isAdmin && (
-              <Paper sx={{ p: 2, mb: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Admin Panel
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                  <TextField
-                    label="New Domain"
-                    value={newDomain}
-                    onChange={(e) => setNewDomain(e.target.value)}
-                    placeholder="e.g. gmail.com"
-                  />
-                  <Button 
-                    variant="contained" 
-                    onClick={() => {
-                      addDomain(newDomain);
-                      setNewDomain('');
-                    }}
-                    disabled={!newDomain || loading}
+    <GoogleOAuthProvider clientId="148714805290-dj5sljtj437rr5nu8hcpo85pm869201e.apps.googleusercontent.com">
+      <ErrorBoundary>
+        <Container>
+          {!account ? (
+            // Step 1: Wallet Connection
+            <Box sx={{ textAlign: 'center', my: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Please connect your wallet to continue
+              </Typography>
+              <Button 
+                variant="contained" 
+                onClick={connectWallet}
+                disabled={loading}
+              >
+                Connect Wallet
+              </Button>
+            </Box>
+          ) : !isLoggedIn ? (
+            <Box sx={{ textAlign: 'center', my: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Please login with Google
+              </Typography>
+              <GoogleLogin
+                onSuccess={(credentialResponse) => {
+                  if (credentialResponse.credential) {
+                    console.log(credentialResponse.credential);
+                    parseJwt(credentialResponse.credential);
+                    setJWT(credentialResponse.credential);
+                    setIsLoggedIn(true);
+                  }
+                }}
+                onError={() => {
+                  setError('Login failed, please try again');
+                }}
+              />
+            </Box>
+          ) : (
+            <>
+              {requiresUpdate.length > 0 && isAdmin && (
+                <Box sx={{ textAlign: 'center', my: 2 }}>
+                  <Button
+                    variant="contained"
+                    color="warning"
+                    onClick={updateModuli}
+                    startIcon={<RefreshIcon />}
                   >
-                    Add Domain
+                    {`${requiresUpdate.length} Updates Required`}
                   </Button>
                 </Box>
-                
-                <Typography variant="subtitle2">
-                  Approved Domains:
-                </Typography>
-                <List>
-                  {approvedDomains.map((domain, index) => (
-                    <ListItem key={index}>
-                      <ListItemText primary={domain} />
-                    </ListItem>
-                  ))}
-                </List>
-              </Paper>
-            )}
-
-            {isLoggedIn ? (
-              <>
-                <Typography variant="subtitle1" sx={{ mb: 2 }}>
-                  Connected: {account}
-                </Typography>
-                <Typography variant="subtitle2" sx={{ mb: 2 }}>
-                  Email: {userEmail}
-                </Typography>
-                
-                {/* Proposal Creation Form */}
+              )}
+              {/* Admin Panel */}
+              {isAdmin && (
                 <Paper sx={{ p: 2, mb: 2 }}>
-                  <Card sx={{ mb: 2 }}>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        Create New Proposal
-                      </Typography>
-                      <Box component="form" sx={{ '& > *': { mb: 2 } }}>
-                        <TextField
-                          fullWidth
-                          label="Title"
-                          value={newProposal.title}
-                          onChange={(e) => setNewProposal({
-                            ...newProposal,
-                            title: e.target.value
-                          })}
-                        />
-                        <TextField
-                          fullWidth
-                          multiline
-                          rows={4}
-                          label="Description"
-                          value={newProposal.description}
-                          onChange={(e) => setNewProposal({
-                            ...newProposal,
-                            description: e.target.value
-                          })}
-                        />
-                        <TextField
-                          type="datetime-local"
-                          label="Start Time"
-                          value={new Date(newProposal.startTime * 1000).toISOString().slice(0, 16)}
-                          onChange={(e) => setNewProposal({
-                            ...newProposal,
-                            startTime: Math.floor(new Date(e.target.value).getTime() / 1000)
-                          })}
-                          fullWidth
-                        />
-                        <Button
-                          variant="contained"
-                          onClick={createProposal}
-                          disabled={loading || !account}
-                        >
-                          {loading ? <CircularProgress size={24} /> : 'Create Proposal'}
-                        </Button>
-                      </Box>
-                    </CardContent>
-                  </Card>
+                  <Typography variant="h6" gutterBottom>
+                    Admin Panel
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                    <TextField
+                      label="New Domain"
+                      value={newDomain}
+                      onChange={(e) => setNewDomain(e.target.value)}
+                      placeholder="e.g. gmail.com"
+                    />
+                    <Button 
+                      variant="contained" 
+                      onClick={() => {
+                        addDomain(newDomain);
+                        setNewDomain('');
+                      }}
+                      disabled={!newDomain || loading}
+                    >
+                      Add Domain
+                    </Button>
+                  </Box>
+                  
+                  <Typography variant="subtitle2">
+                    Approved Domains:
+                  </Typography>
+                  <List>
+                    {approvedDomains.map((domain, index) => (
+                      <ListItem key={index}>
+                        <ListItemText primary={domain} />
+                      </ListItem>
+                    ))}
+                  </List>
                 </Paper>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <Button 
-            variant="outlined"
-            onClick={fetchProposals}
-            disabled={loading}
-          >
-            Refresh Proposals
-          </Button>
-        </Box>
-                {/* Proposals List */}
-                <Paper sx={{ p: 2 }}>
-                  {proposals.map((proposal, index) => (
-                    <Card key={index} sx={{ mb: 2 }}>
+              )}
+
+              {isLoggedIn ? (
+                <>
+                  <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                    Connected: {account}
+                  </Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 2 }}>
+                    Email: {userEmail}
+                  </Typography>
+                  
+                  {/* Proposal Creation Form */}
+                  <Paper sx={{ p: 2, mb: 2 }}>
+                    <Card sx={{ mb: 2 }}>
                       <CardContent>
-                        <Typography variant="h6">{proposal.title}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            <strong>Title:</strong> {proposal.title} <br />
-                            <strong>Votes For:</strong> {proposal.votedYes} <br />
-                            <strong>Votes Against:</strong> {proposal.votedNo} <br />
-                
-                            <strong>Executed:</strong> {proposal.executed ? 'Yes' : 'No'}
+                        <Typography variant="h6" gutterBottom>
+                          Create New Proposal
                         </Typography>
-                        <Box sx={{ mt: 2 }}>
+                        <Box component="form" sx={{ '& > *': { mb: 2 } }}>
+                          <TextField
+                            fullWidth
+                            label="Title"
+                            value={newProposal.title}
+                            onChange={(e) => setNewProposal({
+                              ...newProposal,
+                              title: e.target.value
+                            })}
+                          />
+                          <TextField
+                            fullWidth
+                            multiline
+                            rows={4}
+                            label="Description"
+                            value={newProposal.description}
+                            onChange={(e) => setNewProposal({
+                              ...newProposal,
+                              description: e.target.value
+                            })}
+                          />
+                          <TextField
+                            type="datetime-local"
+                            label="Start Time"
+                            value={new Date(newProposal.startTime * 1000).toISOString().slice(0, 16)}
+                            onChange={(e) => setNewProposal({
+                              ...newProposal,
+                              startTime: Math.floor(new Date(e.target.value).getTime() / 1000)
+                            })}
+                            fullWidth
+                          />
                           <Button
                             variant="contained"
-                            color="success"
-                            onClick={() => castVote(index, true)}
-                            disabled={loading}
-                            sx={{ mr: 1 }}
+                            onClick={createProposal}
+                            disabled={loading || !account}
                           >
-                            Vote For
-                          </Button>
-                          <Button
-                            variant="contained"
-                            color="error"
-                            onClick={() => castVote(index, false)}
-                            disabled={loading}
-                          >
-                            Vote Against
+                            {loading ? <CircularProgress size={24} /> : 'Create Proposal'}
                           </Button>
                         </Box>
                       </CardContent>
                     </Card>
-                  ))}
-                </Paper>
-              </>
-            ) : (
-              <div style={{ backgroundColor: 'white', padding: '20px' }}>
-                <LoginForm 
-                  onLogin={handleLogin} 
-                  checkRegistration={checkRegistration}
-                />
-              </div>
-            )}
-          </>
-        )}
-        
-        {/* Error Display */}
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
-          </Alert>
-        )}
-        
-        {/* Loading Indicator */}
-        {loading && (
-          <LinearProgress sx={{ mt: 2 }} />
-        )}
-      </Container>
-    </ErrorBoundary>
+                  </Paper>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <Button 
+              variant="outlined"
+              onClick={fetchProposals}
+              disabled={loading}
+            >
+              Refresh Proposals
+            </Button>
+          </Box>
+                  {/* Proposals List */}
+                  <Paper sx={{ p: 2 }}>
+                    {proposals.map((proposal, index) => (
+                      <Card key={index} sx={{ mb: 2 }}>
+                        <CardContent>
+                          <Typography variant="h6">{proposal.title}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                              <strong>Title:</strong> {proposal.title} <br />
+                              <strong>Votes For:</strong> {proposal.votedYes} <br />
+                              <strong>Votes Against:</strong> {proposal.votedNo} <br />
+                  
+                              <strong>Executed:</strong> {proposal.executed ? 'Yes' : 'No'}
+                          </Typography>
+                          <Box sx={{ mt: 2 }}>
+                            <Button
+                              variant="contained"
+                              color="success"
+                              onClick={() => castVote(proposal.ipfsHash, true)}
+                              disabled={loading}
+                              sx={{ mr: 1 }}
+                            >
+                              Vote For
+                            </Button>
+                            <Button
+                              variant="contained"
+                              color="error"
+                              onClick={() => castVote(proposal.ipfsHash, false)}
+                              disabled={loading}
+                            >
+                              Vote Against
+                            </Button>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Paper>
+                </>
+              ) : (
+                <div style={{ backgroundColor: 'white', padding: '20px' }}>
+                  <LoginForm 
+                    onLogin={handleLogin} 
+                    checkRegistration={checkRegistration}
+                  />
+                </div>
+              )}
+            </>
+          )}
+          
+          {/* Error Display */}
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+          
+          {/* Loading Indicator */}
+          {loading && (
+            <LinearProgress sx={{ mt: 2 }} />
+          )}
+        </Container>
+      </ErrorBoundary>
+    </GoogleOAuthProvider>
   );
 };

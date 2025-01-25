@@ -12,6 +12,10 @@ export interface LoginFormProps {
   checkRegistration: (domain: string) => Promise<boolean>;
 }
 
+export interface JWT {
+  kid: string
+  n: string
+}
 
 export interface CachedProposal extends Proposal {
   ipfsHash: string
@@ -26,6 +30,7 @@ export interface BlockRange {
   fromBlock: bigint
   toBlock: bigint
 }
+
 
 // Interface for Proposal structure
 export interface Proposal {
