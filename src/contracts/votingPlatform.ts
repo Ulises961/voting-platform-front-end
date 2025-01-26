@@ -27,17 +27,46 @@ export const CONTRACT_ABI = [
     type: "function"
   },
   {
-    inputs: [{ internalType: "address", name: "_proposedAdmin", type: "address" }],
-    name: "proposeAdmin",
+    inputs: [{ internalType: "address", name: "_newAdmin", type: "address" }],
+    name: "proposeNewAdmin",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function"
   },
   {
     inputs: [{ internalType: "address", name: "_proposedAdmin", type: "address" }],
-    name: "approveAdmin",
+    name: "approveNewAdmin",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "_headerJson",
+        type: "string"
+      },
+      {
+        internalType: "string",
+        name: "_payloadJson",
+        type: "string"
+      },
+      {
+        internalType: "bytes",
+        name: "_signature",
+        type: "bytes"
+      }
+    ],
+    name: "login",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool"
+      }
+    ],
+    stateMutability: "view",
     type: "function"
   },
   
@@ -64,13 +93,6 @@ export const CONTRACT_ABI = [
     inputs: [],
     name: "getDomains",
     outputs: [{ internalType: "string[]", name: "", type: "string[]" }],
-    stateMutability: "view",
-    type: "function"
-  },
-  {
-    inputs: [{ internalType: "string", name: "", type: "string" }],
-    name: "approvedDomains",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
     stateMutability: "view",
     type: "function"
   },
@@ -120,21 +142,18 @@ export const CONTRACT_ABI = [
   
   // Voter Management
   {
-    inputs: [{ internalType: "string", name: "_domain", type: "string" }],
+    inputs: [
+      { internalType: "string", name: "_headerJson", type: "string" },
+      { internalType: "string", name: "_payload", type: "string" },
+      { internalType: "bytes", name: "_signature", type: "bytes" },
+    ],
     name: "registerWithDomain",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function"
   },
-  {
-    inputs: [{ internalType: "string", name: "_domain", type: "string" }],
-    name: "isVoterRegistered",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
-    stateMutability: "view",
-    type: "function"
-  },
 
-  // Token Claimer
+  // JWT validator
   {
     inputs: [
       { internalType: "string", name: "kid", type: "string" },

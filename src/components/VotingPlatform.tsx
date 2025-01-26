@@ -1,10 +1,11 @@
 // VotingPlatform.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { Base64 } from 'js-base64';
-import {Buffer} from 'buffer';
+import { Buffer } from 'buffer';
 import { GoogleLogin } from "@react-oauth/google"
 import { GoogleOAuthProvider } from '@react-oauth/google';
+
 declare global {
   interface Window {
     ethereum?: any;
@@ -28,16 +29,14 @@ import {
 } from '@mui/material';
 import { ErrorBoundary } from './ErrorBoundary';
 import { pinProposalToIPFS } from '../utilities/ipfsUtils';
-import { CACHE_DURATION, PROPOSALS_PER_PAGE } from '../config/constants';
-import { CachedProposal, JWT, Proposal, VotingPlatformProps } from '../types/interfaces';
-import { Log } from 'ethers';
-import { useProposalBlocks } from '../utilities/proposalsCache';
-import { createPublicClient, Hex, http } from 'viem';
+import { JWT, Proposal, VotingPlatformProps } from '../types/interfaces';
+import { createPublicClient, fromHex, Hex, http } from 'viem';
 import { hardhat } from 'viem/chains';
 import { LoginForm } from './LoginForm';
 import { useQuery } from "@tanstack/react-query"
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { parse } from 'path';
+import { config } from 'process';
+import { PINATA_GATEWAY } from '../config/constants';
 
 
 export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) => {
@@ -84,7 +83,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         const accounts = await window.ethereum.request({
           method: 'eth_requestAccounts'
         });
-        
+
         const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
         const votingContract = new ethers.Contract(
@@ -106,20 +105,20 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
 
   const fetchProposals = async () => {
     if (!contract) return;
-  
+
     try {
       setLoading(true);
-      
+
       const proposalsArray = await contract.getAllProposals();
       const formattedProposals = proposalsArray.map((proposal: any) => ({
         ipfsHash: proposal.ipfsHash,
-          title: proposal.title,
-          votedYes: parseInt(proposal.votedYes.toString(), 10),
-          votedNo: parseInt(proposal.votedNo.toString(), 10),
-          endTime: proposal.endTime, // Convert timestamp to human-readable format
-          executed: proposal.executed,
-        }));
-      //fetchPinataProposals(formattedProposals); TODO: Implement this function
+        title: proposal.title,
+        votedYes: parseInt(proposal.votedYes.toString(), 10),
+        votedNo: parseInt(proposal.votedNo.toString(), 10),
+        endTime: proposal.endTime, // Convert timestamp to human-readable format
+        executed: proposal.executed,
+      }));
+      // fetchPinataProposals(formattedProposals);
       setProposals(formattedProposals);
     } catch (err) {
       setError('Failed to fetch proposals')
@@ -129,11 +128,25 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   }
 
+  // const fetchPinataProposals = async (proposals: Proposal[]) => {
+  //   const pinataProposals = await Promise.all(proposals.map(async (proposal) => {
+  //     const ipfsData = await publicClient.get(pinataKeys[0], proposal.ipfsHash);
+  //     return {
+  //       ...proposal,
+  //       description: ipfsData.description,
+  //       creator: ipfsData.creator,
+  //       timestamp: ipfsData.timestamp,
+  //     };
+  //   });
+  //   setProposals(pinataProposals);
+  // };
+
   const updateModuli = async () => {
     if (!contract || !latestSigners) {
       return
     }
     try {
+      // TODO: IMPLEMENT SINGLE TRANSACTION TO AVOID CREATING QUEUES
       setLoading(true)
       for (const jwt of requiresUpdate) {
         const modulus = jwt.n;
@@ -160,6 +173,33 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   }
 
+  // const base64Address = btoa(
+  //   fromHex(account, { to: "bytes" }).reduce(
+  //     (data, byte) => data + String.fromCharCode(byte),
+  //     ""
+  //   )
+  // )
+  //   .replace("=", "")
+  //   .replace("+", "-")
+  //   .replaceAll("/", "_")
+
+  const base64UrlEncode = (address: string): string => {
+    const bytes = new Uint8Array(address.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+      const hexByte = address.slice(i * 2, i * 2 + 2);
+      bytes[i] = parseInt(hexByte, 16);
+    }
+
+    const binaryString = Array.from(bytes)
+      .map(byte => String.fromCharCode(byte))
+      .join('');
+
+    return btoa(binaryString)
+      .replace(/=/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+  };
+
   const base64UrlToHex = (n: string): `0x${string}` => {
     const bytes = Base64.toUint8Array(n.replace(/-/g, '+').replace(/_/g, '/'));
     return `0x${Array.from<number>(bytes).map(b => b.toString(16).padStart(2, '0')).join('')}`;
@@ -169,37 +209,40 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     if (!contract || !latestSigners) {
       return
     }
-    console.log("Getting requires update")
+    console.log("Getting required update: Latest signers: ", latestSigners)
     const updatesRequired: JWT[] = []
-    const currentModuli = await contract.getAllModuli();
-    for (const jwt of latestSigners.keys) {
-      const modulus = jwt.n;
-      const parsed = base64UrlToHex(modulus)
-      console.log("Checking modulus:", parsed)
-      if (!currentModuli.includes(parsed)) {
-        updatesRequired.push(jwt)
-      }else{
-        console.log("Modulus already exists: ", currentModuli.includes(parsed))
+    try {
+      const currentModuli = await contract.getAllModuli();
+      for (const jwt of latestSigners.keys) {
+        const modulus = jwt.n;
+        const parsed = base64UrlToHex(modulus)
+        console.log("Checking modulus:", parsed)
+        if (!currentModuli.includes(parsed)) {
+          updatesRequired.push(jwt)
+        } else {
+          console.log("Modulus already exists: ", currentModuli.includes(parsed))
+        }
       }
+      setRequiresUpdate(updatesRequired)
+    } catch (err) {
+      console.error("Error fetching moduli: ", err)
     }
-    setRequiresUpdate(updatesRequired)
+
   }
-
-
 
   // Fetch proposals on component mount
   useEffect(() => {
-    fetchProposals()
+    // fetchProposals()
     getRequiresUpdate().catch(console.error)
-  }, [contract, newProposal.title, latestSigners])
+  }, [contract, latestSigners])
 
   // Create new proposal
   const createProposal = async () => {
     if (!contract || !account) return;
-  
+
     try {
       setLoading(true);
-  
+
       const metadata = {
         title: newProposal.title,
         description: newProposal.description,
@@ -207,15 +250,15 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         creator: account,
         timestamp: Math.floor(Date.now() / 1000)
       };
-  
+
       const ipfsHash = await pinProposalToIPFS(metadata);
-  
+
       const tx = await contract.createProposal(
         ipfsHash,
         newProposal.title,
         newProposal.startTime
       );
-  
+
       await tx.wait();
       await fetchProposals();
     } catch (err) {
@@ -225,7 +268,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       setLoading(false);
     }
   };
-  
+
 
   // Cast vote
   const castVote = async (proposalId: string, support: boolean) => {
@@ -259,21 +302,19 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       setError('Please connect your wallet first');
       return;
     }
-  
+
     try {
       setLoading(true);
-      const domain = email.split('@')[1];
-      
+      const { header, payload, hexSig } = parseJwt(jwt as string);
+
       if (isRegistering) {
-        const tx = await contract.registerWithDomain(domain);
+        const tx = await contract.registerWithDomain(header, payload, hexSig);
         await tx.wait();
       } else {
-        // const isRegistered = await contract.isVoterRegistered(domain);
-        // if (!isRegistered) {
-        //   throw new Error('Domain not registered for this wallet');
-        // }
+        const tx = await contract.login(header, payload, hexSig);
+        await tx.wait();
       }
-      
+
       setUserEmail(email);
       setIsLoggedIn(true);
     } catch (err) {
@@ -289,11 +330,11 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   const checkAdminStatus = async () => {
     if (!contract || !account) return;
     try {
-        const isAdminResult = await contract.admins(account);
-        console.log('isAdminResult:', isAdminResult);
-        setIsAdmin(isAdminResult);
+      const isAdminResult = await contract.isAdmin(account);
+      console.log('isAdminResult:', isAdminResult);
+      setIsAdmin(isAdminResult);
     } catch (err) {
-        console.error('Error checking admin:', err);
+      console.error('Error checking admin:', err);
     }
   };
 
@@ -301,29 +342,29 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   const addDomain = async (domain: string) => {
     if (!contract || !isAdmin) return;
     try {
-        const tx = await contract.addDomain(domain);
-        await tx.wait();
-        console.log('Domain added:', domain);
-        fetchApprovedDomains();
+      const tx = await contract.addDomain(domain);
+      await tx.wait();
+      console.log('Domain added:', domain);
+      fetchApprovedDomains();
     } catch (err) {
-        setError('Failed to add domain');
+      setError('Failed to add domain');
     }
   };
 
   const fetchApprovedDomains = async () => {
     if (!contract) return;
     try {
-        const domains = await contract.getDomains();
-        setApprovedDomains(domains);
+      const domains = await contract.getDomains();
+      setApprovedDomains(domains);
     } catch (err) {
-        console.error('Error fetching domains:', err);
+      console.error('Error fetching domains:', err);
     }
   };
 
   useEffect(() => {
     if (contract && account) {
-        checkAdminStatus();
-        fetchApprovedDomains();
+      checkAdminStatus();
+      fetchApprovedDomains();
     }
   }, [contract, account]);
 
@@ -337,8 +378,8 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
               <Typography variant="h6" gutterBottom>
                 Please connect your wallet to continue
               </Typography>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 onClick={connectWallet}
                 disabled={loading}
               >
@@ -351,7 +392,8 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                 Please login with Google
               </Typography>
               <GoogleLogin
-                onSuccess={(credentialResponse) => {
+                nonce={base64UrlEncode(account)}
+                onSuccess={(credentialResponse: any) => {
                   if (credentialResponse.credential) {
                     console.log(credentialResponse.credential);
                     parseJwt(credentialResponse.credential);
@@ -391,8 +433,8 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                       onChange={(e) => setNewDomain(e.target.value)}
                       placeholder="e.g. gmail.com"
                     />
-                    <Button 
-                      variant="contained" 
+                    <Button
+                      variant="contained"
                       onClick={() => {
                         addDomain(newDomain);
                         setNewDomain('');
@@ -402,7 +444,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                       Add Domain
                     </Button>
                   </Box>
-                  
+
                   <Typography variant="subtitle2">
                     Approved Domains:
                   </Typography>
@@ -424,7 +466,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                   <Typography variant="subtitle2" sx={{ mb: 2 }}>
                     Email: {userEmail}
                   </Typography>
-                  
+
                   {/* Proposal Creation Form */}
                   <Paper sx={{ p: 2, mb: 2 }}>
                     <Card sx={{ mb: 2 }}>
@@ -475,14 +517,14 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                     </Card>
                   </Paper>
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-            <Button 
-              variant="outlined"
-              onClick={fetchProposals}
-              disabled={loading}
-            >
-              Refresh Proposals
-            </Button>
-          </Box>
+                    <Button
+                      variant="outlined"
+                      onClick={fetchProposals}
+                      disabled={loading}
+                    >
+                      Refresh Proposals
+                    </Button>
+                  </Box>
                   {/* Proposals List */}
                   <Paper sx={{ p: 2 }}>
                     {proposals.map((proposal, index) => (
@@ -490,11 +532,11 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                         <CardContent>
                           <Typography variant="h6">{proposal.title}</Typography>
                           <Typography variant="body2" color="text.secondary">
-                              <strong>Title:</strong> {proposal.title} <br />
-                              <strong>Votes For:</strong> {proposal.votedYes} <br />
-                              <strong>Votes Against:</strong> {proposal.votedNo} <br />
-                  
-                              <strong>Executed:</strong> {proposal.executed ? 'Yes' : 'No'}
+                            <strong>Title:</strong> {proposal.title} <br />
+                            <strong>Votes For:</strong> {proposal.votedYes} <br />
+                            <strong>Votes Against:</strong> {proposal.votedNo} <br />
+
+                            <strong>Executed:</strong> {proposal.executed ? 'Yes' : 'No'}
                           </Typography>
                           <Box sx={{ mt: 2 }}>
                             <Button
@@ -522,22 +564,22 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                 </>
               ) : (
                 <div style={{ backgroundColor: 'white', padding: '20px' }}>
-                  <LoginForm 
-                    onLogin={handleLogin} 
+                  <LoginForm
+                    onLogin={handleLogin}
                     checkRegistration={checkRegistration}
                   />
                 </div>
               )}
             </>
           )}
-          
+
           {/* Error Display */}
           {error && (
             <Alert severity="error" sx={{ mt: 2 }}>
               {error}
             </Alert>
           )}
-          
+
           {/* Loading Indicator */}
           {loading && (
             <LinearProgress sx={{ mt: 2 }} />
