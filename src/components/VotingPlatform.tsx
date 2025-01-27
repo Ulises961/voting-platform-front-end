@@ -324,7 +324,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         await tx.wait();
       }
       
-      const loginTx = await contract.login(header, payload, hexSig, account);
+      const loginTx = await contract.login(header, payload, hexSig);
       await loginTx.wait();
       setIsLoggedIn(true);
     } catch (err) {
