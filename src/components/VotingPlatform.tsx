@@ -40,6 +40,9 @@ import { useQuery } from "@tanstack/react-query"
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 
+// TODO: CURRENT ISSUE: LOGIN DOES NOT WAIT FOR isRegistering TO BE SET TO TRUE
+// THUS IT NEVER REGISTERS THE USER :)))
+
 export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) => {
   const [contract, setContract] = useState<ethers.Contract | null>(null);
   const [account, setAccount] = useState<string>('');
@@ -77,7 +80,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         .then((data) => data as { keys: JWT[] })
     },
   })
-  console.log(latestSigners)
+  //console.log(latestSigners)
 
   // Connect to MetaMask
   const connectWallet = async () => {
@@ -97,7 +100,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
 
         setAccount(accounts[0]);
         setContract(votingContract);
-        
+
       } else {
         setError('Please install MetaMask');
       }
@@ -155,7 +158,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       for (const jwt of requiresUpdate) {
         const modulus = jwt.n;
         const parsed = base64UrlToHex(modulus)
-        console.log("Adding modulus:", parsed, jwt.kid);
+        //console.log("Adding modulus:", parsed, jwt.kid);
 
         // Add size validation
         if (modulus.length > 514) { // 0x + 512 hex chars
@@ -214,54 +217,57 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   };
 
-  // const handleLogin = async (credentialResponse: any) => {
-  //   console.log("handleLogin", credentialResponse);
+   const handleLogin = async (credentialResponse: any) => {
+     //console.log("handleLogin", credentialResponse);
 
-  //   if (credentialResponse.credential) {
-  //     console.log("credentialResponse.credential", credentialResponse.credential);
+     if (credentialResponse.credential) {
+       //console.log("credentialResponse.credential", credentialResponse.credential);
 
-  //     if (!contract || !account) {
-  //       setError('Please connect your wallet first');
-  //       console.error('Contract or account not set');
-  //       return;
-  //     }
+       if (!contract || !account) {
+         setError('Please connect your wallet first');
+         console.error('Contract or account not set');
+         return;
+       }
 
-  //     console.log(credentialResponse.credential);
-  //     const { header, payload, hexSig } = parseJwt(credentialResponse.credential);
-  //     console.log("header: ",header,"payload:", payload,"signature:", hexSig);
-  //     if (isRegistering) {
-  //       try {
-  //         let tx = await contract.registerWithDomain(header, payload, hexSig);
-  //         await tx.wait();
-  //         tx = await contract!.login(header, payload, hexSig);
-  //         await tx.wait();
-  //       } catch (err) {
-  //         console.error('Login after registration error:', err);
-  //         setError(err instanceof Error ? err.message : 'Failed to process request');
-  //         setIsLoggedIn(false);
-  //       }
-  //     } else {
-  //       try {
-  //         const tx = await contract.login(header, payload, hexSig);
-  //         await tx.wait();
-  //       } catch (err) {
-  //         console.error('Login error:', err);
-  //         setError(err instanceof Error ? err.message : 'Failed to process request');
-  //         setIsLoggedIn(false);
-  //       }
-  //       setJWT(credentialResponse.credential);
-  //       setIsLoggedIn(true);
-  //     }
-  //   }
-  // }
+       //console.log(credentialResponse.credential);
+       const { header, payload, hexSig } = parseJwt(credentialResponse.credential);
+       //console.log("header: ",header,"payload:", payload,"signature:", hexSig);
+       if (isRegistering) {
+         try {
+           let tx = await contract.registerWithDomain(header, payload, hexSig);
+           await tx.wait();
+           tx = await contract!.login(header, payload, hexSig);
+           await tx.wait();
+         } catch (err) {
+           console.error('Login after registration error:', err);
+           setError(err instanceof Error ? err.message : 'Failed to process request');
+           setIsLoggedIn(false);
+         }
+       } else {
+         try {
+           const tx = await contract.login(header, payload, hexSig);
+           await tx.wait();
+         } catch (err) {
+           console.error('Login error:', err);
+           setError(err instanceof Error ? err.message : 'Failed to process request');
+           setIsLoggedIn(false);
+         }
+         setJWT(credentialResponse.credential);
+         setIsLoggedIn(true);
+       }
+     }
+   }
 
+
+
+
+  // USE EFFECT TO UPDATE MODULI IF ISADMIN == TRUE 
   useEffect(() => {
     console.log('States updated:', {
       hasContract: !!contract,
       hasAccount: !!account,
       hasLatestSigners: !!latestSigners
     });
-  
     if (contract && account && latestSigners) {
       checkAdminAndModuli();
     }
@@ -298,66 +304,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       console.error('Error checking admin status:', err);
     }
   };
-  
-  
 
-  const handleLogin = async (credentialResponse: any) => {
-    if (!contract || !account || !latestSigners) {
-      setError('Please connect your wallet first');
-      return;
-    }
-  
-    try {
-      const isAdminResult = await contract.admins(account);
-      setIsAdmin(isAdminResult);
-  
-      if (isAdminResult) {
-        const currentModuli = await contract.getAllModuli();
-        const updatesRequired: JWT[] = [];
-        
-        for (const jwt of latestSigners.keys) {
-          const modulus = jwt.n;
-          const parsed = base64UrlToHex(modulus);
-          if (!currentModuli.includes(parsed)) {
-            updatesRequired.push(jwt);
-          }
-        }
-  
-        if (updatesRequired.length > 0) {
-          setRequiresUpdate(updatesRequired);
-          setShowUpdateModal(true);
-          // Store credential for later use
-          setJWT(credentialResponse.credential);
-          return;
-        }
-      }
-      // Continue with normal login flow
-      continueLogin(credentialResponse.credential);
-    } catch (err) {
-      console.error('Login error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to process request');
-    }
-  };
-
-  const continueLogin = async (credential: string) => {
-    if (!contract || !account) return;
-    
-    try {
-      const { header, payload, hexSig } = parseJwt(credential);
-      
-      if (isRegistering) {
-        const tx = await contract.registerWithDomain(header, payload, hexSig);
-        await tx.wait();
-      }
-      
-      const loginTx = await contract.login(header, payload, hexSig);
-      await loginTx.wait();
-      setIsLoggedIn(true);
-    } catch (err) {
-      console.error('Login continuation error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to process request');
-    }
-  };
 
   const UpdateModal = () => (
     <Dialog open={showUpdateModal} onClose={() => setShowUpdateModal(false)}>
@@ -372,9 +319,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
           onClick={async () => {
             await updateModuli();
             setShowUpdateModal(false);
-            if (jwt) {
-              continueLogin(jwt);
-            }
           }}
           disabled={loading}
         >
@@ -388,7 +332,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     if (!contract || !latestSigners) {
       return
     }
-    console.log("Getting required update: Latest signers: ", latestSigners)
+    //console.log("Getting required update: Latest signers: ", latestSigners)
     const updatesRequired: JWT[] = []
     try {
       const currentModuli = await contract.getAllModuli();
@@ -398,7 +342,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         if (!currentModuli.includes(parsed)) {
           updatesRequired.push(jwt)
         } else {
-          console.log("Modulus already exists: ", currentModuli.includes(parsed))
+          //console.log("Modulus already exists: ", currentModuli.includes(parsed))
         }
       }
       setRequiresUpdate(updatesRequired)
@@ -407,22 +351,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
 
   }
-
-  // const checkUserRegistration = async () => {
-  //   console.log("checking registration");
-  //   if (!contract) return;
-  //     // Get the list of events with the VoterRegistered event so we can check if the user is registered
-  //     const voterRegisteredFilter = contract.filters.VoterRegistered()
-  //     const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
-  //     // Check if the user is registered
-  //     const isRegistered = voterRegisteredEvents.some(event => 'args' in event && event.args?.voter === account)
-  //     // If the user is not registered, register them
-  //     console.log('isRegistered:', isRegistered);
-  //     if (!isRegistered) {
-  //       console.log('User is not registered');
-  //       setIsRegistering(true);
-  //     }
-  // }
 
   useEffect(() => {
     if (!contract || !latestSigners) {
@@ -443,8 +371,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         setIsRegistering(true);
       }
     }
-  }, [contract,account, latestSigners]);
-
+  }, [contract,account,latestSigners]);
 
 
   // Fetch proposals on component mount
@@ -519,7 +446,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     if (!contract || !account) return;
     try {
       const isAdminResult = await contract.isAdmin(account);
-      console.log('isAdminResult:', isAdminResult);
+      //console.log('isAdminResult:', isAdminResult);
       setIsAdmin(isAdminResult);
     } catch (err) {
       console.error('Error checking admin:', err);
@@ -532,7 +459,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     try {
       const tx = await contract.addDomain(domain);
       await tx.wait();
-      console.log('Domain added:', domain);
+      //console.log('Domain added:', domain);
       fetchApprovedDomains();
     } catch (err) {
       setError('Failed to add domain');
