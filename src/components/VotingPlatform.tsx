@@ -26,12 +26,15 @@ import {
   List,
   ListItem,
   ListItemText,
+  DialogContent,
+  Dialog,
+  DialogTitle,
 } from '@mui/material';
 import { ErrorBoundary } from './ErrorBoundary';
 import { pinProposalToIPFS } from '../utilities/ipfsUtils';
 import { JWT, Proposal, VotingPlatformProps } from '../types/interfaces';
 import { createPublicClient, Hex, http } from 'viem';
-import { hardhat } from 'viem/chains';
+import { base, hardhat } from 'viem/chains';
 import { LoginForm } from './LoginForm';
 import { useQuery } from "@tanstack/react-query"
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -42,6 +45,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   const [account, setAccount] = useState<string>('');
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [isRegistering, setIsRegistering] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [page, setPage] = useState(0);
   const [publicClient] = useState(createPublicClient({
@@ -56,6 +60,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
 
   const [requiresUpdate, setRequiresUpdate] = useState<JWT[]>([])
   const [jwt, setJWT] = useState<string | undefined>(undefined)
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
 
   // Form states
   const [newProposal, setNewProposal] = useState({
@@ -156,7 +161,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
           throw new Error('Modulus too large');
         }
 
-        const tx = await contract.addModulus(jwt.kid, parsed, {gasLimit: 500000})
+        const tx = await contract.addModulus(jwt.kid, parsed, { gasLimit: 500000 })
         await tx.wait()
       }
       setRequiresUpdate([])
@@ -177,7 +182,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         Buffer.from(token.split(".")[2], "base64").toString("hex")) as Hex,
     }
   }
-
   // const base64Address = btoa(
   //   fromHex(account, { to: "bytes" }).reduce(
   //     (data, byte) => data + String.fromCharCode(byte),
@@ -198,29 +202,155 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     const binaryString = Array.from(bytes)
       .map(byte => String.fromCharCode(byte))
       .join('');
-
-    return btoa(binaryString)
-      .replace(/=/g, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_');
+    const base64String = btoa(binaryString)
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+    console.log("base64UrlEncode:", base64String, "   address:", address);
+    return base64String;
   };
 
   const base64UrlToHex = (n: string): `0x${string}` => {
     try {
-        const bytes = Base64.toUint8Array(n.replace(/-/g, '+').replace(/_/g, '/'));
-        const hex = Array.from<number>(bytes)
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-        // Ensure the hex string is valid
-        if (!/^[0-9a-f]+$/i.test(hex)) {
-            throw new Error('Invalid hex string generated');
-        }
-        return `0x${hex}`;
+      const bytes = Base64.toUint8Array(n.replace(/-/g, '+').replace(/_/g, '/'));
+      const hex = Array.from<number>(bytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      // Ensure the hex string is valid
+      if (!/^[0-9a-f]+$/i.test(hex)) {
+        throw new Error('Invalid hex string generated');
+      }
+      return `0x${hex}`;
     } catch (error) {
-        console.error('Error converting base64URL to hex:', error);
-        throw error;
+      console.error('Error converting base64URL to hex:', error);
+      throw error;
     }
-};
+  };
+
+  // const handleLogin = async (credentialResponse: any) => {
+  //   console.log("handleLogin", credentialResponse);
+
+  //   if (credentialResponse.credential) {
+  //     console.log("credentialResponse.credential", credentialResponse.credential);
+
+  //     if (!contract || !account) {
+  //       setError('Please connect your wallet first');
+  //       console.error('Contract or account not set');
+  //       return;
+  //     }
+
+  //     console.log(credentialResponse.credential);
+  //     const { header, payload, hexSig } = parseJwt(credentialResponse.credential);
+  //     console.log("header: ",header,"payload:", payload,"signature:", hexSig);
+  //     if (isRegistering) {
+  //       try {
+  //         let tx = await contract.registerWithDomain(header, payload, hexSig);
+  //         await tx.wait();
+  //         tx = await contract!.login(header, payload, hexSig);
+  //         await tx.wait();
+  //       } catch (err) {
+  //         console.error('Login after registration error:', err);
+  //         setError(err instanceof Error ? err.message : 'Failed to process request');
+  //         setIsLoggedIn(false);
+  //       }
+  //     } else {
+  //       try {
+  //         const tx = await contract.login(header, payload, hexSig);
+  //         await tx.wait();
+  //       } catch (err) {
+  //         console.error('Login error:', err);
+  //         setError(err instanceof Error ? err.message : 'Failed to process request');
+  //         setIsLoggedIn(false);
+  //       }
+  //       setJWT(credentialResponse.credential);
+  //       setIsLoggedIn(true);
+  //     }
+  //   }
+  // }
+
+  const handleLogin = async (credentialResponse: any) => {
+    if (!contract || !account || !latestSigners) {
+      setError('Please connect your wallet first');
+      return;
+    }
+  
+    try {
+      const isAdminResult = await contract.admins(account);
+      setIsAdmin(isAdminResult);
+  
+      if (isAdminResult) {
+        const currentModuli = await contract.getAllModuli();
+        const updatesRequired: JWT[] = [];
+        
+        for (const jwt of latestSigners.keys) {
+          const modulus = jwt.n;
+          const parsed = base64UrlToHex(modulus);
+          if (!currentModuli.includes(parsed)) {
+            updatesRequired.push(jwt);
+          }
+        }
+  
+        if (updatesRequired.length > 0) {
+          setRequiresUpdate(updatesRequired);
+          setShowUpdateModal(true);
+          // Store credential for later use
+          setJWT(credentialResponse.credential);
+          return;
+        }
+      }
+  
+      // Continue with normal login flow
+      continueLogin(credentialResponse.credential);
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to process request');
+    }
+  };
+
+  const continueLogin = async (credential: string) => {
+    if (!contract || !account) return;
+    
+    try {
+      const { header, payload, hexSig } = parseJwt(credential);
+      
+      if (isRegistering) {
+        const tx = await contract.registerWithDomain(header, payload, hexSig);
+        await tx.wait();
+      }
+      
+      const loginTx = await contract.login(header, payload, hexSig);
+      await loginTx.wait();
+      setIsLoggedIn(true);
+    } catch (err) {
+      console.error('Login continuation error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to process request');
+    }
+  };
+
+  const UpdateModal = () => (
+    <Dialog open={showUpdateModal} onClose={() => setShowUpdateModal(false)}>
+      <DialogTitle>Update Required</DialogTitle>
+      <DialogContent>
+        <Typography gutterBottom>
+          {requiresUpdate.length} moduli need to be updated.
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={async () => {
+            await updateModuli();
+            setShowUpdateModal(false);
+            if (jwt) {
+              continueLogin(jwt);
+            }
+          }}
+          disabled={loading}
+        >
+          Update Moduli
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
 
   const getRequiresUpdate = async () => {
     if (!contract || !latestSigners) {
@@ -245,6 +375,23 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
 
   }
+
+  useEffect(() => {
+    if (!contract || !latestSigners) {
+      return
+    }
+    async () => {
+      // Get the list of events with the VoterRegistered event so we can check if the user is registered
+      const voterRegisteredFilter = contract.filters.VoterRegistered()
+      const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
+      // Check if the user is registered
+      const isRegistered = voterRegisteredEvents.some(event => 'args' in event && event.args?.voter === account)
+      // If the user is not registered, register them
+      if (!isRegistered) {
+        setIsRegistering(true);
+      }
+    }
+  }, []);
 
   // Fetch proposals on component mount
   useEffect(() => {
@@ -310,35 +457,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     } catch (err) {
       console.error('Error checking registration:', err);
       return false;
-    }
-  };
-
-  const handleLogin = async (email: string, isRegistering: boolean) => {
-    if (!contract || !account) {
-      setError('Please connect your wallet first');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const { header, payload, hexSig } = parseJwt(jwt as string);
-
-      if (isRegistering) {
-        const tx = await contract.registerWithDomain(header, payload, hexSig);
-        await tx.wait();
-      } else {
-        const tx = await contract.login(header, payload, hexSig);
-        await tx.wait();
-      }
-
-      setUserEmail(email);
-      setIsLoggedIn(true);
-    } catch (err) {
-      console.error('Login error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to process request');
-      setIsLoggedIn(false);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -409,14 +527,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
               </Typography>
               <GoogleLogin
                 nonce={base64UrlEncode(account)}
-                onSuccess={(credentialResponse: any) => {
-                  if (credentialResponse.credential) {
-                    console.log(credentialResponse.credential);
-                    parseJwt(credentialResponse.credential);
-                    setJWT(credentialResponse.credential);
-                    setIsLoggedIn(true);
-                  }
-                }}
+                onSuccess={handleLogin}
                 onError={() => {
                   setError('Login failed, please try again');
                 }}
@@ -424,7 +535,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
             </Box>
           ) : (
             <>
-              {(
+              {(isAdmin) && (
                 <Box sx={{ textAlign: 'center', my: 2 }}>
                   <Button
                     variant="contained"
@@ -473,8 +584,8 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                   </List>
                 </Paper>
               )}
-
-              {isLoggedIn ? (
+              
+              {isLoggedIn && (
                 <>
                   <Typography variant="subtitle1" sx={{ mb: 2 }}>
                     Connected: {account}
@@ -578,13 +689,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                     ))}
                   </Paper>
                 </>
-              ) : (
-                <div style={{ backgroundColor: 'white', padding: '20px' }}>
-                  <LoginForm
-                    onLogin={handleLogin}
-                    checkRegistration={checkRegistration}
-                  />
-                </div>
               )}
             </>
           )}
@@ -600,6 +704,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
           {loading && (
             <LinearProgress sx={{ mt: 2 }} />
           )}
+          <UpdateModal />
         </Container>
       </ErrorBoundary>
     </GoogleOAuthProvider>
