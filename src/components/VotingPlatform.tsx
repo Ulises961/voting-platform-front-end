@@ -97,6 +97,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
 
         setAccount(accounts[0]);
         setContract(votingContract);
+        
       } else {
         setError('Please install MetaMask');
       }
@@ -194,27 +195,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     .replace("+", "-")
     .replaceAll("/", "_");
 
-  console.log("base64Address:", base64Address, "   account:", account);
-
-  const base64UrlEncode = (address: string): string => {
-    const bytes = new Uint8Array(address.length / 2);
-    for (let i = 0; i < bytes.length; i++) {
-      const hexByte = address.slice(i * 2, i * 2 + 2);
-      bytes[i] = parseInt(hexByte, 16);
-    }
-
-    const binaryString = Array.from(bytes)
-      .map(byte => String.fromCharCode(byte))
-      .join('');
-    const base64String = btoa(binaryString)
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
-    console.log("base64UrlEncode:", base64String, "   address:", address);
-    return base64String;
-  };
-
-
+//  console.log("base64Address:", base64Address, "   account:", account);
 
   const base64UrlToHex = (n: string): `0x${string}` => {
     try {
@@ -274,6 +255,52 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   //   }
   // }
 
+  useEffect(() => {
+    console.log('States updated:', {
+      hasContract: !!contract,
+      hasAccount: !!account,
+      hasLatestSigners: !!latestSigners
+    });
+  
+    if (contract && account && latestSigners) {
+      checkAdminAndModuli();
+    }
+  }, [contract, account, latestSigners]);
+
+  const checkAdminAndModuli = async () => {
+    if (!contract || !account || !latestSigners) {
+      console.error('contract, account, or latestSigners not set');
+      return;
+    }
+    
+    try {
+      const isAdminResult = await contract.admins(account);
+      setIsAdmin(isAdminResult);
+  
+      if (isAdminResult) {
+        const currentModuli = await contract.getAllModuli();
+        const updatesRequired: JWT[] = [];
+        
+        for (const jwt of latestSigners.keys) {
+          const modulus = jwt.n;
+          const parsed = base64UrlToHex(modulus);
+          if (!currentModuli.includes(parsed)) {
+            updatesRequired.push(jwt);
+          }
+        }
+  
+        if (updatesRequired.length > 0) {
+          setRequiresUpdate(updatesRequired);
+          setShowUpdateModal(true);
+        }
+      }
+    } catch (err) {
+      console.error('Error checking admin status:', err);
+    }
+  };
+  
+  
+
   const handleLogin = async (credentialResponse: any) => {
     if (!contract || !account || !latestSigners) {
       setError('Please connect your wallet first');
@@ -304,7 +331,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
           return;
         }
       }
-  
       // Continue with normal login flow
       continueLogin(credentialResponse.credential);
     } catch (err) {
@@ -382,22 +408,44 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
 
   }
 
+  // const checkUserRegistration = async () => {
+  //   console.log("checking registration");
+  //   if (!contract) return;
+  //     // Get the list of events with the VoterRegistered event so we can check if the user is registered
+  //     const voterRegisteredFilter = contract.filters.VoterRegistered()
+  //     const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
+  //     // Check if the user is registered
+  //     const isRegistered = voterRegisteredEvents.some(event => 'args' in event && event.args?.voter === account)
+  //     // If the user is not registered, register them
+  //     console.log('isRegistered:', isRegistered);
+  //     if (!isRegistered) {
+  //       console.log('User is not registered');
+  //       setIsRegistering(true);
+  //     }
+  // }
+
   useEffect(() => {
     if (!contract || !latestSigners) {
+      console.log("Contract or latest signers not set");
       return
     }
     async () => {
+      console.log("checking registration");
       // Get the list of events with the VoterRegistered event so we can check if the user is registered
       const voterRegisteredFilter = contract.filters.VoterRegistered()
       const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
       // Check if the user is registered
       const isRegistered = voterRegisteredEvents.some(event => 'args' in event && event.args?.voter === account)
       // If the user is not registered, register them
+      console.log('isRegistered:', isRegistered);
       if (!isRegistered) {
+        console.log('User is not registered');
         setIsRegistering(true);
       }
     }
-  }, []);
+  }, [contract,account, latestSigners]);
+
+
 
   // Fetch proposals on component mount
   useEffect(() => {
