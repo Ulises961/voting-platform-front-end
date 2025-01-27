@@ -20,6 +20,25 @@ export interface Voter {
 export const CONTRACT_ABI = [
   // Admin Management
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_account",
+        "type": "address"
+      }
+    ],
+    "name": "isAdmin",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     inputs: [{ internalType: "address", name: "_account", type: "address" }],
     name: "admins",
     outputs: [{ internalType: "bool", name: "", type: "bool" }],
@@ -69,7 +88,7 @@ export const CONTRACT_ABI = [
     stateMutability: "view",
     type: "function"
   },
-  
+
   // Domain Management
   {
     inputs: [{ internalType: "string", name: "_domain", type: "string" }],
@@ -96,7 +115,7 @@ export const CONTRACT_ABI = [
     stateMutability: "view",
     type: "function"
   },
-  
+
   // Proposal Management
   {
     inputs: [
@@ -139,7 +158,7 @@ export const CONTRACT_ABI = [
     stateMutability: "nonpayable",
     type: "function"
   },
-  
+
   // Voter Management
   {
     inputs: [
@@ -184,7 +203,7 @@ export const CONTRACT_ABI = [
     stateMutability: "view",
     type: "function"
   },
-  
+
   // Events
   {
     anonymous: false,

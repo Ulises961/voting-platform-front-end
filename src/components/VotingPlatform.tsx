@@ -30,13 +30,11 @@ import {
 import { ErrorBoundary } from './ErrorBoundary';
 import { pinProposalToIPFS } from '../utilities/ipfsUtils';
 import { JWT, Proposal, VotingPlatformProps } from '../types/interfaces';
-import { createPublicClient, fromHex, Hex, http } from 'viem';
+import { createPublicClient, Hex, http } from 'viem';
 import { hardhat } from 'viem/chains';
 import { LoginForm } from './LoginForm';
 import { useQuery } from "@tanstack/react-query"
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { config } from 'process';
-import { PINATA_GATEWAY } from '../config/constants';
 
 
 export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) => {
@@ -151,14 +149,21 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       for (const jwt of requiresUpdate) {
         const modulus = jwt.n;
         const parsed = base64UrlToHex(modulus)
-        const tx = await contract.addModulus(jwt.kid, parsed)
+        console.log("Adding modulus:", parsed, jwt.kid);
+
+        // Add size validation
+        if (modulus.length > 514) { // 0x + 512 hex chars
+          throw new Error('Modulus too large');
+        }
+
+        const tx = await contract.addModulus(jwt.kid, parsed, {gasLimit: 500000})
         await tx.wait()
       }
       setRequiresUpdate([])
       //await fetchProposals()
     } catch (err) {
       setError('Failed to update moduli')
-      console.error(err)
+      console.error("Failed to update moduli", err)
     } finally {
       setLoading(false)
     }
@@ -201,9 +206,21 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   };
 
   const base64UrlToHex = (n: string): `0x${string}` => {
-    const bytes = Base64.toUint8Array(n.replace(/-/g, '+').replace(/_/g, '/'));
-    return `0x${Array.from<number>(bytes).map(b => b.toString(16).padStart(2, '0')).join('')}`;
-  };
+    try {
+        const bytes = Base64.toUint8Array(n.replace(/-/g, '+').replace(/_/g, '/'));
+        const hex = Array.from<number>(bytes)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        // Ensure the hex string is valid
+        if (!/^[0-9a-f]+$/i.test(hex)) {
+            throw new Error('Invalid hex string generated');
+        }
+        return `0x${hex}`;
+    } catch (error) {
+        console.error('Error converting base64URL to hex:', error);
+        throw error;
+    }
+};
 
   const getRequiresUpdate = async () => {
     if (!contract || !latestSigners) {
@@ -216,7 +233,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       for (const jwt of latestSigners.keys) {
         const modulus = jwt.n;
         const parsed = base64UrlToHex(modulus)
-        console.log("Checking modulus:", parsed)
         if (!currentModuli.includes(parsed)) {
           updatesRequired.push(jwt)
         } else {
@@ -408,7 +424,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
             </Box>
           ) : (
             <>
-              {requiresUpdate.length > 0 && isAdmin && (
+              {(
                 <Box sx={{ textAlign: 'center', my: 2 }}>
                   <Button
                     variant="contained"
@@ -421,7 +437,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                 </Box>
               )}
               {/* Admin Panel */}
-              {isAdmin && (
+              {(
                 <Paper sx={{ p: 2, mb: 2 }}>
                   <Typography variant="h6" gutterBottom>
                     Admin Panel
