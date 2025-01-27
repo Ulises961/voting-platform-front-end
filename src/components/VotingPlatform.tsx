@@ -217,6 +217,23 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   };
 
+  const checkUserRegistration = async () => {
+    if (!contract) return;
+    
+      console.log("checking registration");
+      // Get the list of events with the VoterRegistered event so we can check if the user is registered
+      const voterRegisteredFilter = contract.filters.VoterRegistered()
+      const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
+      // Check if the user is registered
+      const isRegistered = voterRegisteredEvents.some(event => 'args' in event && event.args?.voter === account)
+      // If the user is not registered, register them
+      console.log('isRegistered:', isRegistered);
+      if (!isRegistered) {
+        console.log('User is not registered');
+        setIsRegistering(true);
+      }
+  }  
+
    const handleLogin = async (credentialResponse: any) => {
      //console.log("handleLogin", credentialResponse);
 
@@ -234,9 +251,10 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
        //console.log("header: ",header,"payload:", payload,"signature:", hexSig);
        if (isRegistering) {
          try {
+            console.log("Registering user");
            let tx = await contract.registerWithDomain(header, payload, hexSig);
            await tx.wait();
-           tx = await contract!.login(header, payload, hexSig);
+           tx = await contract.login(header, payload, hexSig);
            await tx.wait();
          } catch (err) {
            console.error('Login after registration error:', err);
@@ -251,14 +269,13 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
            console.error('Login error:', err);
            setError(err instanceof Error ? err.message : 'Failed to process request');
            setIsLoggedIn(false);
+           return;
          }
          setJWT(credentialResponse.credential);
          setIsLoggedIn(true);
        }
      }
    }
-
-
 
 
   // USE EFFECT TO UPDATE MODULI IF ISADMIN == TRUE 
@@ -270,6 +287,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     });
     if (contract && account && latestSigners) {
       checkAdminAndModuli();
+      checkUserRegistration();
     }
   }, [contract, account, latestSigners]);
 
@@ -351,27 +369,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
 
   }
-
-  useEffect(() => {
-    if (!contract || !latestSigners) {
-      console.log("Contract or latest signers not set");
-      return
-    }
-    async () => {
-      console.log("checking registration");
-      // Get the list of events with the VoterRegistered event so we can check if the user is registered
-      const voterRegisteredFilter = contract.filters.VoterRegistered()
-      const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
-      // Check if the user is registered
-      const isRegistered = voterRegisteredEvents.some(event => 'args' in event && event.args?.voter === account)
-      // If the user is not registered, register them
-      console.log('isRegistered:', isRegistered);
-      if (!isRegistered) {
-        console.log('User is not registered');
-        setIsRegistering(true);
-      }
-    }
-  }, [contract,account,latestSigners]);
 
 
   // Fetch proposals on component mount
