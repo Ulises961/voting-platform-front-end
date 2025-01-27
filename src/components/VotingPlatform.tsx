@@ -33,7 +33,7 @@ import {
 import { ErrorBoundary } from './ErrorBoundary';
 import { pinProposalToIPFS } from '../utilities/ipfsUtils';
 import { JWT, Proposal, VotingPlatformProps } from '../types/interfaces';
-import { createPublicClient, Hex, http } from 'viem';
+import { createPublicClient, fromHex ,Hex, http } from 'viem';
 import { base, hardhat } from 'viem/chains';
 import { LoginForm } from './LoginForm';
 import { useQuery } from "@tanstack/react-query"
@@ -182,15 +182,19 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         Buffer.from(token.split(".")[2], "base64").toString("hex")) as Hex,
     }
   }
-  // const base64Address = btoa(
-  //   fromHex(account, { to: "bytes" }).reduce(
-  //     (data, byte) => data + String.fromCharCode(byte),
-  //     ""
-  //   )
-  // )
-  //   .replace("=", "")
-  //   .replace("+", "-")
-  //   .replaceAll("/", "_")
+  
+
+  const base64Address = btoa(
+    fromHex(account as `0x${string}`, { to: "bytes" }).reduce(
+      (data, byte) => data + String.fromCharCode(byte),
+      ""
+    )
+  )
+    .replace("=", "")
+    .replace("+", "-")
+    .replaceAll("/", "_");
+
+  console.log("base64Address:", base64Address, "   account:", account);
 
   const base64UrlEncode = (address: string): string => {
     const bytes = new Uint8Array(address.length / 2);
@@ -209,6 +213,8 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     console.log("base64UrlEncode:", base64String, "   address:", address);
     return base64String;
   };
+
+
 
   const base64UrlToHex = (n: string): `0x${string}` => {
     try {
@@ -318,7 +324,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         await tx.wait();
       }
       
-      const loginTx = await contract.login(header, payload, hexSig);
+      const loginTx = await contract.login(header, payload, hexSig, account);
       await loginTx.wait();
       setIsLoggedIn(true);
     } catch (err) {
@@ -526,7 +532,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                 Please login with Google
               </Typography>
               <GoogleLogin
-                nonce={base64UrlEncode(account)}
+                nonce={base64Address}
                 onSuccess={handleLogin}
                 onError={() => {
                   setError('Login failed, please try again');

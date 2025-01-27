@@ -75,7 +75,8 @@ export const CONTRACT_ABI = [
         internalType: "bytes",
         name: "_signature",
         type: "bytes"
-      }
+      },
+      { name: "_sender", type: "address", internalType: "address" }
     ],
     name: "login",
     outputs: [
