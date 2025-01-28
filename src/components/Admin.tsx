@@ -53,7 +53,7 @@ const Admin = () => {
             return addresses.includes(account);
         });
         // If the user is not registered, register them
-        dispatch({ type: 'SET_IS_REGISTERED', payload: true });
+        dispatch({ type: 'SET_IS_REGISTERED', payload: isRegistered });
         console.log('isRegistered:', isRegistered);
     }
 

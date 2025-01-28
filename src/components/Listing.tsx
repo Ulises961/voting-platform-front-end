@@ -164,7 +164,7 @@ const Listing = () => {
                                     <Button
                                         variant="contained"
                                         onClick={createProposal}
-                                        disabled={loading || !account}
+                                        disabled={loading || !account || !newProposal.title.trim() || !newProposal.description.trim()}
                                     >
                                         {loading ? <CircularProgress size={24} /> : 'Create Proposal'}
                                     </Button>
@@ -192,7 +192,6 @@ const Listing = () => {
                                         <strong>ID</strong> {proposal.ipfsHash} <br />
                                         <strong>Votes For:</strong> {proposal.votedYes} <br />
                                         <strong>Votes Against:</strong> {proposal.votedNo} <br />
-
                                         <strong>Executed:</strong> {proposal.executed ? 'Yes' : 'No'}
                                     </Typography>
                                     <Box sx={{ mt: 2 }}>
