@@ -33,7 +33,7 @@ import {
 import { ErrorBoundary } from './ErrorBoundary';
 import { pinProposalToIPFS } from '../utilities/ipfsUtils';
 import { JWT, Proposal, VotingPlatformProps } from '../types/interfaces';
-import { createPublicClient, fromHex ,Hex, http } from 'viem';
+import { createPublicClient, fromHex, Hex, http } from 'viem';
 import { base, hardhat } from 'viem/chains';
 import { LoginForm } from './LoginForm';
 import { useQuery } from "@tanstack/react-query"
@@ -115,14 +115,13 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
 
     try {
       setLoading(true);
-
       const proposalsArray = await contract.getAllProposals();
       const formattedProposals = proposalsArray.map((proposal: any) => ({
         ipfsHash: proposal.ipfsHash,
         title: proposal.title,
         votedYes: parseInt(proposal.votedYes.toString(), 10),
         votedNo: parseInt(proposal.votedNo.toString(), 10),
-        endTime: proposal.endTime, // Convert timestamp to human-readable format
+        endTime: proposal.endTime, // TODO: Convert timestamp to human-readable format
         executed: proposal.executed,
       }));
       // fetchPinataProposals(formattedProposals);
@@ -186,7 +185,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
         Buffer.from(token.split(".")[2], "base64").toString("hex")) as Hex,
     }
   }
-  
+
 
   const base64Address = btoa(
     fromHex(account as `0x${string}`, { to: "bytes" }).reduce(
@@ -198,7 +197,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     .replace("+", "-")
     .replaceAll("/", "_");
 
-//  console.log("base64Address:", base64Address, "   account:", account);
+  //  console.log("base64Address:", base64Address, "   account:", account);
 
   const base64UrlToHex = (n: string): `0x${string}` => {
     try {
@@ -219,64 +218,73 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
 
   const checkUserRegistration = async () => {
     if (!contract) return;
-    
-      console.log("checking registration");
-      // Get the list of events with the VoterRegistered event so we can check if the user is registered
-      const voterRegisteredFilter = contract.filters.VoterRegistered()
-      const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
-      // Check if the user is registered
-      const isRegistered = voterRegisteredEvents.some(event => 'args' in event && event.args?.voter === account)
-      // If the user is not registered, register them
-      console.log('isRegistered:', isRegistered);
-      if (!isRegistered) {
-        console.log('User is not registered');
-        setIsRegistering(true);
+    console.log("checking registration");
+    // Get the list of events with the VoterRegistered event so we can check if the user is registered
+    const voterRegisteredFilter = contract.filters.VoterRegistered()
+    const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
+    console.log('voterRegisteredEvents:', voterRegisteredEvents);
+    // Check if the user is registered
+    const isRegistered = voterRegisteredEvents.some(event => {
+      const addresses:Array<string> = event.args?.map((address: string) => address.toLowerCase());     
+      return addresses.includes(account);
+    });
+    // If the user is not registered, register them
+    console.log('isRegistered:', isRegistered);
+    setIsRegistering(false);
+    if (!isRegistered) {
+      console.log('User is not registered');
+      setIsRegistering(true);
+    }
+  }
+
+  // TODO: FIX LOGIN TO WAIT FOR isRegistering TO BE SET TO TRUE
+  const handleGoogleLogin = async (credentialResponse: any) => {
+    //console.log("handleLogin", credentialResponse);
+
+    if (credentialResponse.credential) {
+      //console.log("credentialResponse.credential", credentialResponse.credential);
+
+      if (!contract || !account) {
+        setError('Please connect your wallet first');
+        console.error('Contract or account not set');
+        return;
       }
-  }  
 
-   const handleLogin = async (credentialResponse: any) => {
-     //console.log("handleLogin", credentialResponse);
+      setJWT(credentialResponse.credential);
+    }
+  }
 
-     if (credentialResponse.credential) {
-       //console.log("credentialResponse.credential", credentialResponse.credential);
+  const handleLogin = async () => {
+    if (isRegistering || !contract || !latestSigners) {
+      return
+    }
 
-       if (!contract || !account) {
-         setError('Please connect your wallet first');
-         console.error('Contract or account not set');
-         return;
-       }
+    try {
+      const { header, payload, hexSig } = parseJwt(jwt as string);
+      const tx = await contract.login(header, payload, hexSig);
+      setIsLoggedIn(tx);
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to process request');
+      setIsLoggedIn(false);
+      return;
+    }
+  };
 
-       //console.log(credentialResponse.credential);
-       const { header, payload, hexSig } = parseJwt(credentialResponse.credential);
-       //console.log("header: ",header,"payload:", payload,"signature:", hexSig);
-       if (isRegistering) {
-         try {
-            console.log("Registering user");
-           let tx = await contract.registerWithDomain(header, payload, hexSig);
-           await tx.wait();
-           tx = await contract.login(header, payload, hexSig);
-           await tx.wait();
-         } catch (err) {
-           console.error('Login after registration error:', err);
-           setError(err instanceof Error ? err.message : 'Failed to process request');
-           setIsLoggedIn(false);
-         }
-       } else {
-         try {
-           const tx = await contract.login(header, payload, hexSig);
-           await tx.wait();
-         } catch (err) {
-           console.error('Login error:', err);
-           setError(err instanceof Error ? err.message : 'Failed to process request');
-           setIsLoggedIn(false);
-           return;
-         }
-         setJWT(credentialResponse.credential);
-         setIsLoggedIn(true);
-       }
-     }
-   }
-
+  const handleRegister = async () => {
+    if (!isRegistering || !contract || !latestSigners) { return; }
+    try {
+      const { header, payload, hexSig } = parseJwt(jwt as string);
+      const tx = await contract.registerWithDomain(header, payload, hexSig);
+      await tx.wait();
+      setIsRegistering(false);
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to process request');
+      setIsRegistering(true);
+      return;
+    }
+  };
 
   // USE EFFECT TO UPDATE MODULI IF ISADMIN == TRUE 
   useEffect(() => {
@@ -289,22 +297,22 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       checkAdminAndModuli();
       checkUserRegistration();
     }
-  }, [contract, account, latestSigners]);
+  }, [contract, account, latestSigners, isRegistering]);
 
   const checkAdminAndModuli = async () => {
     if (!contract || !account || !latestSigners) {
       console.error('contract, account, or latestSigners not set');
       return;
     }
-    
+
     try {
       const isAdminResult = await contract.admins(account);
       setIsAdmin(isAdminResult);
-  
+
       if (isAdminResult) {
         const currentModuli = await contract.getAllModuli();
         const updatesRequired: JWT[] = [];
-        
+
         for (const jwt of latestSigners.keys) {
           const modulus = jwt.n;
           const parsed = base64UrlToHex(modulus);
@@ -312,7 +320,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
             updatesRequired.push(jwt);
           }
         }
-  
+
         if (updatesRequired.length > 0) {
           setRequiresUpdate(updatesRequired);
           setShowUpdateModal(true);
@@ -485,7 +493,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       <ErrorBoundary>
         <Container>
           {!account ? (
-            // Step 1: Wallet Connection
             <Box sx={{ textAlign: 'center', my: 4 }}>
               <Typography variant="h6" gutterBottom>
                 Please connect your wallet to continue
@@ -498,71 +505,105 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                 Connect Wallet
               </Button>
             </Box>
-          ) : !isLoggedIn ? (
-            <Box sx={{ textAlign: 'center', my: 4 }}>
-              <Typography variant="h6" gutterBottom>
-                Please login with Google
-              </Typography>
-              <GoogleLogin
-                nonce={base64Address}
-                onSuccess={handleLogin}
-                onError={() => {
-                  setError('Login failed, please try again');
-                }}
-              />
-            </Box>
           ) : (
             <>
-              {(isAdmin) && (
-                <Box sx={{ textAlign: 'center', my: 2 }}>
+              {/* Always show admin panel if isAdmin */}
+              {isAdmin && (
+                <>
+                  <Box sx={{ textAlign: 'center', my: 2 }}>
+                    <Button
+                      variant="contained"
+                      color="warning"
+                      onClick={updateModuli}
+                      startIcon={<RefreshIcon />}
+                    >
+                      {`${requiresUpdate.length} Updates Required`}
+                    </Button>
+                  </Box>
+                  <Paper sx={{ p: 2, mb: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Admin Panel
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                      <TextField
+                        label="New Domain"
+                        value={newDomain}
+                        onChange={(e) => setNewDomain(e.target.value)}
+                        placeholder="e.g. gmail.com"
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={() => {
+                          addDomain(newDomain);
+                          setNewDomain('');
+                        }}
+                        disabled={!newDomain || loading}
+                      >
+                        Add Domain
+                      </Button>
+                    </Box>
+                    <Typography variant="subtitle2">
+                      Approved Domains:
+                    </Typography>
+                    <List>
+                      {approvedDomains.map((domain, index) => (
+                        <ListItem key={index}>
+                          <ListItemText primary={domain} />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Paper>
+                </>
+              )}
+
+              {/* Show Google login if not logged in */}
+              {!jwt && (
+                <Box sx={{ textAlign: 'center', my: 4 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Please login with Google
+                  </Typography>
+                  <GoogleLogin
+                    nonce={base64Address}
+                    onSuccess={handleGoogleLogin}
+                    onError={() => {
+                      setError('Login failed, please try again');
+                    }}
+                  />
+                </Box>
+              )}
+              {isRegistering && jwt && (
+                <Box sx={{ textAlign: 'center', my: 4 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Please register with the contract
+                  </Typography>
                   <Button
                     variant="contained"
-                    color="warning"
-                    onClick={updateModuli}
-                    startIcon={<RefreshIcon />}
+                    onClick={handleRegister}
+                    disabled={loading}
                   >
-                    {`${requiresUpdate.length} Updates Required`}
+                    Register
                   </Button>
                 </Box>
               )}
-              {/* Admin Panel */}
-              {(
-                <Paper sx={{ p: 2, mb: 2 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Admin Panel
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                    <TextField
-                      label="New Domain"
-                      value={newDomain}
-                      onChange={(e) => setNewDomain(e.target.value)}
-                      placeholder="e.g. gmail.com"
-                    />
+
+              {
+                !isLoggedIn && !isRegistering && jwt && (
+                  <Box sx={{ textAlign: 'center', my: 4 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Please login with the contract
+                    </Typography>
                     <Button
                       variant="contained"
-                      onClick={() => {
-                        addDomain(newDomain);
-                        setNewDomain('');
-                      }}
-                      disabled={!newDomain || loading}
+                      onClick={handleLogin}
+                      disabled={loading}
                     >
-                      Add Domain
+                      Login
                     </Button>
                   </Box>
+                )
+              }
 
-                  <Typography variant="subtitle2">
-                    Approved Domains:
-                  </Typography>
-                  <List>
-                    {approvedDomains.map((domain, index) => (
-                      <ListItem key={index}>
-                        <ListItemText primary={domain} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Paper>
-              )}
-              
+              {/* Show main content if logged in */}
               {isLoggedIn && (
                 <>
                   <Typography variant="subtitle1" sx={{ mb: 2 }}>
@@ -638,6 +679,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                           <Typography variant="h6">{proposal.title}</Typography>
                           <Typography variant="body2" color="text.secondary">
                             <strong>Title:</strong> {proposal.title} <br />
+                            <strong>ID</strong> {proposal.ipfsHash} <br />
                             <strong>Votes For:</strong> {proposal.votedYes} <br />
                             <strong>Votes Against:</strong> {proposal.votedNo} <br />
 
@@ -682,7 +724,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
           {loading && (
             <LinearProgress sx={{ mt: 2 }} />
           )}
-          <UpdateModal />
+          {/*<UpdateModal />*/}
         </Container>
       </ErrorBoundary>
     </GoogleOAuthProvider>
