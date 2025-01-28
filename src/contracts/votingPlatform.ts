@@ -91,11 +91,51 @@ export const CONTRACT_ABI = [
 
   // Domain Management
   {
-    inputs: [{ internalType: "string", name: "_domain", type: "string" }],
-    name: "addDomain",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function"
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_domain",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_powerLevel",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_parentDomain",
+        "type": "string"
+      }
+    ],
+    "name": "addDomain",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_userDomain",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "_targetDomain",
+        "type": "string"
+      }
+    ],
+    "name": "canAccessDomain",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     inputs: [
@@ -121,7 +161,7 @@ export const CONTRACT_ABI = [
     inputs: [
       { internalType: "string", name: "_ipfsHash", type: "string" },
       { internalType: "string", name: "_title", type: "string" },
-      { internalType: "uint256", name: "_startTime", type: "uint256" }
+      { internalType: "bool", name: "_restrictToDomain", type: "bool" }
     ],
     name: "createProposal",
     outputs: [{ internalType: "string", name: "", type: "string" }],

@@ -1,3 +1,5 @@
+import { ethers } from "ethers";
+
 // Add type safety
 export interface ProposalResponse {
   title: string;
@@ -12,7 +14,7 @@ export interface LoginFormProps {
   checkRegistration: (domain: string) => Promise<boolean>;
 }
 
-export interface JWT {
+export interface GoogleModule {
   kid: string
   n: string
 }
@@ -47,3 +49,34 @@ export interface VotingPlatformProps {
   contractAddress: string;
   contractABI: any;
 }
+
+export interface VotingState {
+  contract: ethers.Contract | null;
+  account: string;
+  jwt: string | null;
+  isAdmin: boolean;
+  votingPeriod: number;
+  isRegistered: boolean;
+  isLoggedIn: boolean;
+  proposals: Proposal[];
+  loading: boolean;
+  error: string | null;
+}
+
+export interface VotingContextType extends VotingState {
+  dispatch: React.Dispatch<VotingAction>;
+}
+
+
+export type VotingAction =
+    | { type: 'SET_CONTRACT'; payload: ethers.Contract }
+    | { type: 'SET_ACCOUNT'; payload: string }
+    | { type: 'SET_IS_ADMIN'; payload: boolean }
+    | { type: 'SET_VOTING_PERIOD'; payload: number }
+    | { type: 'SET_IS_REGISTERED'; payload: boolean }
+    | { type: 'SET_PROPOSALS'; payload: Proposal[] }
+    | { type: 'SET_LOADING'; payload: boolean }
+    | { type: 'SET_ERROR'; payload: string | null }
+    | { type: 'SET_JWT'; payload: string | null }
+    | { type: 'SET_IS_LOGGED_IN'; payload: boolean }
+    ;

@@ -29,13 +29,12 @@ import {
   DialogContent,
   Dialog,
   DialogTitle,
+  Switch,
 } from '@mui/material';
 import { ErrorBoundary } from './ErrorBoundary';
 import { pinProposalToIPFS } from '../utilities/ipfsUtils';
 import { JWT, Proposal, VotingPlatformProps } from '../types/interfaces';
-import { createPublicClient, fromHex, Hex, http } from 'viem';
-import { base, hardhat } from 'viem/chains';
-import { LoginForm } from './LoginForm';
+import { fromHex, Hex } from 'viem';
 import { useQuery } from "@tanstack/react-query"
 import RefreshIcon from '@mui/icons-material/Refresh';
 
@@ -46,26 +45,35 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) => {
   const [contract, setContract] = useState<ethers.Contract | null>(null);
   const [account, setAccount] = useState<string>('');
-  const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [isRegistering, setIsRegistering] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
-  const [page, setPage] = useState(0);
-  const [publicClient] = useState(createPublicClient({
-    chain: hardhat,
-    transport: http()
-  }));
+  // const [page, setPage] = useState(0);
+  // const [publicClient] = useState(createPublicClient({
+  //   chain: hardhat,
+  //   transport: http()
+  // }));
+
+  // in context
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
+  //const [userEmail, setUserEmail] = useState('');
+  
+  
+  const [requiresUpdate, setRequiresUpdate] = useState<JWT[]>([])
+  // const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [jwt, setJWT] = useState<string | undefined>(undefined)
+  
+  // Spostato
+  const [newDomain, setNewDomain] = useState('');
+  const [parentDomain, setParentDomain] = useState('');
+  const [powerLevel, setPowerLevel] = useState('1');
   const [isAdmin, setIsAdmin] = useState(false);
   const [approvedDomains, setApprovedDomains] = useState<string[]>([]);
-  const [newDomain, setNewDomain] = useState('');
-
-  const [requiresUpdate, setRequiresUpdate] = useState<JWT[]>([])
-  const [jwt, setJWT] = useState<string | undefined>(undefined)
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-
-  // Form states
+  const [restrictDomain, setRestrictDomain] = useState(false);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  // Spostato
+  
+  // Form states spostato in Listing
   const [newProposal, setNewProposal] = useState({
     title: '',
     description: '',
@@ -82,6 +90,8 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   })
   //console.log(latestSigners)
 
+
+  // moved to Home.tsx
   // Connect to MetaMask
   const connectWallet = async () => {
     try {
@@ -110,6 +120,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   };
 
+  // Spostato in Listing.tsx
   const fetchProposals = async () => {
     if (!contract) return;
 
@@ -147,6 +158,8 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   //   setProposals(pinataProposals);
   // };
 
+
+  // Moved to Admin.tsx
   const updateModuli = async () => {
     if (!contract || !latestSigners) {
       return
@@ -187,6 +200,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   }
 
 
+  // moved to Home.tsx
   const base64Address = btoa(
     fromHex(account as `0x${string}`, { to: "bytes" }).reduce(
       (data, byte) => data + String.fromCharCode(byte),
@@ -199,6 +213,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
 
   //  console.log("base64Address:", base64Address, "   account:", account);
 
+  // Spostato Admin.tsx
   const base64UrlToHex = (n: string): `0x${string}` => {
     try {
       const bytes = Base64.toUint8Array(n.replace(/-/g, '+').replace(/_/g, '/'));
@@ -216,6 +231,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   };
 
+  // Spostato  Admin.tsx
   const checkUserRegistration = async () => {
     if (!contract) return;
     console.log("checking registration");
@@ -224,7 +240,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
     console.log('voterRegisteredEvents:', voterRegisteredEvents);
     // Check if the user is registered
-    const isRegistered = voterRegisteredEvents.some(event => {
+    const isRegistered = voterRegisteredEvents.some((event: any) => {
       const addresses:Array<string> = event.args?.map((address: string) => address.toLowerCase());     
       return addresses.includes(account);
     });
@@ -237,7 +253,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   }
 
-  // TODO: FIX LOGIN TO WAIT FOR isRegistering TO BE SET TO TRUE
+  // moved to Home.tsx
   const handleGoogleLogin = async (credentialResponse: any) => {
     //console.log("handleLogin", credentialResponse);
 
@@ -253,7 +269,8 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       setJWT(credentialResponse.credential);
     }
   }
-
+  
+ // Spostato LoginForm.tsx
   const handleLogin = async () => {
     if (isRegistering || !contract || !latestSigners) {
       return
@@ -271,6 +288,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   };
 
+  // Spostato login
   const handleRegister = async () => {
     if (!isRegistering || !contract || !latestSigners) { return; }
     try {
@@ -286,6 +304,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   };
 
+  // moved to Admin.tsx
   // USE EFFECT TO UPDATE MODULI IF ISADMIN == TRUE 
   useEffect(() => {
     console.log('States updated:', {
@@ -299,6 +318,8 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   }, [contract, account, latestSigners, isRegistering]);
 
+
+  // moved to Admin.tsx
   const checkAdminAndModuli = async () => {
     if (!contract || !account || !latestSigners) {
       console.error('contract, account, or latestSigners not set');
@@ -323,7 +344,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
 
         if (updatesRequired.length > 0) {
           setRequiresUpdate(updatesRequired);
-          setShowUpdateModal(true);
         }
       }
     } catch (err) {
@@ -332,28 +352,8 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   };
 
 
-  const UpdateModal = () => (
-    <Dialog open={showUpdateModal} onClose={() => setShowUpdateModal(false)}>
-      <DialogTitle>Update Required</DialogTitle>
-      <DialogContent>
-        <Typography gutterBottom>
-          {requiresUpdate.length} moduli need to be updated.
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={async () => {
-            await updateModuli();
-            setShowUpdateModal(false);
-          }}
-          disabled={loading}
-        >
-          Update Moduli
-        </Button>
-      </DialogContent>
-    </Dialog>
-  );
 
+  // Spostato
   const getRequiresUpdate = async () => {
     if (!contract || !latestSigners) {
       return
@@ -379,13 +379,12 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   }
 
 
-  // Fetch proposals on component mount
+  // Fetch moduli updates on component mount /// Spostato
   useEffect(() => {
-    // fetchProposals()
     getRequiresUpdate().catch(console.error)
   }, [contract, latestSigners])
 
-  // Create new proposal
+  // Spostato in Listing.tsx
   const createProposal = async () => {
     if (!contract || !account) return;
 
@@ -405,7 +404,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
       const tx = await contract.createProposal(
         ipfsHash,
         newProposal.title,
-        newProposal.startTime
+        restrictDomain
       );
 
       await tx.wait();
@@ -419,7 +418,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
   };
 
 
-  // Cast vote
+  // Cast vote Spostato in Listing
   const castVote = async (proposalId: string, support: boolean) => {
     if (!contract) return;
 
@@ -435,17 +434,19 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   };
 
-  const checkRegistration = async (domain: string) => {
-    if (!contract || !account) return false;
-    try {
-      const isRegistered = await contract.isDomainRegistered(domain);
-      return isRegistered;
-    } catch (err) {
-      console.error('Error checking registration:', err);
-      return false;
-    }
-  };
+  // spostato ma non serve
+  // const checkRegistration = async (domain: string) => {
+  //   if (!contract || !account) return false;
+  //   try {
+  //     const isRegistered = await contract.isDomainRegistered(domain);
+  //     return isRegistered;
+  //   } catch (err) {
+  //     console.error('Error checking registration:', err);
+  //     return false;
+  //   }
+  // };
 
+  // moved to Home.tsx
   // Add admin check
   const checkAdminStatus = async () => {
     if (!contract || !account) return;
@@ -458,19 +459,22 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   };
 
+  
+  // moved to Admin.tsx
   // Add domain management for admins
-  const addDomain = async (domain: string) => {
+  const addDomain = async (domain: string, powerLevel: number, parentDomain: string) => {
     if (!contract || !isAdmin) return;
     try {
-      const tx = await contract.addDomain(domain);
+      const tx = await contract.addDomain(domain, powerLevel, parentDomain);
       await tx.wait();
-      //console.log('Domain added:', domain);
       fetchApprovedDomains();
     } catch (err) {
       setError('Failed to add domain');
+      console.error(err);
     }
   };
 
+  // moved to Admin.tsx
   const fetchApprovedDomains = async () => {
     if (!contract) return;
     try {
@@ -481,6 +485,7 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
     }
   };
 
+  
   useEffect(() => {
     if (contract && account) {
       checkAdminStatus();
@@ -524,20 +529,36 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                     <Typography variant="h6" gutterBottom>
                       Admin Panel
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
                       <TextField
                         label="New Domain"
                         value={newDomain}
                         onChange={(e) => setNewDomain(e.target.value)}
-                        placeholder="e.g. gmail.com"
+                        placeholder="e.g. studenti.unitn.it"
+                      />
+                      <TextField
+                        label="Parent Domain (optional)"
+                        value={parentDomain}
+                        onChange={(e) => setParentDomain(e.target.value)}
+                        placeholder="e.g. unitn.it"
+                      />
+                      <TextField
+                        label="Power Level"
+                        type="number"
+                        value={powerLevel}
+                        onChange={(e) => setPowerLevel(e.target.value)}
+                        slotProps={{ input: { min: "1" } }}
                       />
                       <Button
                         variant="contained"
                         onClick={() => {
-                          addDomain(newDomain);
+                          console.log('Restrict domain:', restrictDomain);
+                          addDomain(newDomain, Number(powerLevel), parentDomain);
                           setNewDomain('');
+                          setParentDomain('');
+                          setPowerLevel('1');
                         }}
-                        disabled={!newDomain || loading}
+                        disabled={!newDomain || loading || !powerLevel}
                       >
                         Add Domain
                       </Button>
@@ -609,10 +630,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                   <Typography variant="subtitle1" sx={{ mb: 2 }}>
                     Connected: {account}
                   </Typography>
-                  <Typography variant="subtitle2" sx={{ mb: 2 }}>
-                    Email: {userEmail}
-                  </Typography>
-
                   {/* Proposal Creation Form */}
                   <Paper sx={{ p: 2, mb: 2 }}>
                     <Card sx={{ mb: 2 }}>
@@ -641,6 +658,13 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
                               description: e.target.value
                             })}
                           />
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography>Restrict Domain:</Typography>
+                          <Switch
+                            checked={restrictDomain}
+                            onChange={(e) => setRestrictDomain(e.target.checked)}
+                          />
+                          </Box>
                           <TextField
                             type="datetime-local"
                             label="Start Time"
@@ -719,7 +743,6 @@ export const VotingPlatform: React.FC<VotingPlatformProps> = ({ contractAddress,
               {error}
             </Alert>
           )}
-
           {/* Loading Indicator */}
           {loading && (
             <LinearProgress sx={{ mt: 2 }} />
