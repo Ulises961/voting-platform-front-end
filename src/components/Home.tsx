@@ -4,6 +4,8 @@ import { ethers } from 'ethers';
 import { GoogleLogin } from "@react-oauth/google"
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
+
+
 declare global {
     interface Window {
         ethereum?: any;
@@ -64,6 +66,7 @@ const Home: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) =
                 );
 
                 setAccount(accounts[0]);
+                console.log('Connected account:', accounts[0]);
                 setContract(votingContract);
 
             } else {
@@ -79,7 +82,7 @@ const Home: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) =
         if (!contract || !account) return;
         try {
             const isAdminResult = await contract.isAdmin(account);
-            //console.log('isAdminResult:', isAdminResult);
+            console.log('isAdminResult:', isAdminResult);
             setIsAdmin(isAdminResult);
         } catch (err) {
             console.error('Error checking admin:', err);
@@ -140,9 +143,8 @@ const Home: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) =
             setJWT(credentialResponse.credential);
         }
     }
-  
     return (
-        <GoogleOAuthProvider clientId="148714805290-dj5sljtj437rr5nu8hcpo85pm869201e.apps.googleusercontent.com">
+        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID!}>
             <ErrorBoundary>
                 <Container>
                     {!account ? (
@@ -154,7 +156,7 @@ const Home: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) =
                                 variant="contained"
                                 onClick={connectWallet}
                                 disabled={loading}
-                            >
+                                >
                                 Connect Wallet
                             </Button>
                         </Box>

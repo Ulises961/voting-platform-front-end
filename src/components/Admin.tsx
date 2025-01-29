@@ -24,6 +24,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 
 import { useVoting } from '../context/VotingContext';
 
+import { ethers } from 'ethers';
 
 // Admin component
 const Admin = () => {
@@ -167,10 +168,18 @@ const Admin = () => {
         }
     }
 
+    const REGISTRATION_FEE = ethers.parseEther(process.env.NEXT_PUBLIC_DOMAIN_REGISTRATION_FEE);
     const addDomain = async (domain: string, powerLevel: number, parentDomain: string) => {
         if (!contract || !isAdmin) return;
         try {
-            const tx = await contract.addDomain(domain, powerLevel, parentDomain);
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+     
+            const tx = await contract.addDomain(domain, powerLevel, parentDomain,
+                {
+                    value : REGISTRATION_FEE
+                }
+            );
             await tx.wait();
             fetchApprovedDomains();
         } catch (err) {
@@ -255,7 +264,7 @@ const Admin = () => {
                     onClick={handleAddDomain}
                     disabled={!newDomain || loading || !powerLevel}
                 >
-                    Add Domain
+                    Add Domain ({process.env.NEXT_PUBLIC_DOMAIN_REGISTRATION_FEE} ETH)
                 </Button>
             </Box>
             <Typography variant="subtitle2">

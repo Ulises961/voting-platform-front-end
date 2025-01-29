@@ -28,11 +28,12 @@ const Login = () => {
 
   const handleRegister = async () => {
     if (isRegistered || !contract) { return; }
-
+            
     try {
       const { header, payload, hexSig } = parseJwt(jwt as string);
-      const tx = await contract.registerWithDomain(header, payload, hexSig);
-      await tx.wait();
+      
+      const domain = await contract.registerWithDomain(header, payload, hexSig);
+      //await checkDomain(domain);
       dispatch({ type: 'SET_IS_REGISTERED', payload: true });
     } catch (err) {
       console.error('Registration error:', err);

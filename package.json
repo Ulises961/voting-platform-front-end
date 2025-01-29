@@ -4,10 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "npx serve@latest ./build"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -21,6 +20,8 @@
     "ipfs-http-client": "^60.0.1",
     "js-base64": "^3.7.7",
     "jwt-decode": "^4.0.0",
+    "next": "^15.1.6",
+    "node": "^18.20.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.1.3",

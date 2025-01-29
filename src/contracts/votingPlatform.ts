@@ -1,5 +1,3 @@
-import { CONTRACT_ADDRESS } from "../config/constants"
-
 // Types for frontend use
 export interface Proposal {
   ipfsHash: string;
@@ -207,7 +205,9 @@ export const CONTRACT_ABI = [
       { internalType: "bytes", name: "_signature", type: "bytes" },
     ],
     name: "registerWithDomain",
-    outputs: [],
+    outputs: [
+      {internalType: "string", name: "domain", type: "string"}
+    ],
     stateMutability: "nonpayable",
     type: "function"
   },
@@ -285,6 +285,6 @@ export const CONTRACT_ABI = [
 
 // Export contract config
 export const VOTING_PLATFORM = {
-  address: CONTRACT_ADDRESS,
+  address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS,
   abi: CONTRACT_ABI,
 } as const
