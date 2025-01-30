@@ -16,7 +16,6 @@ import {
     Paper,
     Switch,
 } from '@mui/material';
-import { pinProposalToIPFS } from '../utilities/ipfsUtils';
 import { Proposal } from '../types/interfaces';
 import { useVoting } from '../context/VotingContext';
 
@@ -35,33 +34,54 @@ const Listing = () => {
     const setError = (error: string) => dispatch({ type: 'SET_ERROR', payload: error });
 
     const createProposal = async () => {
-        if (!contract || !account) return;
+        if (!account) return;
 
         try {
             setLoading(true);
 
-            const metadata = {
-                title: newProposal.title,
-                description: newProposal.description,
-                startTime: newProposal.startTime,
-                creator: account,
-                timestamp: Math.floor(Date.now() / 1000)
-            };
-            console.log('Metadata:', metadata);
-            
-            const ipfsHash = await pinProposalToIPFS(metadata);
-            console.log('IPFS Hash:', ipfsHash);
-            
-            const tx = await contract.createProposal(
-                ipfsHash,
-                newProposal.title,
-                restrictDomain
-            );
+            const response = await fetch('/api/ipfs', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    title: newProposal.title,
+                    description: newProposal.description,
+                    startTime: newProposal.startTime,
+                    creator: account,
+                    timestamp: Math.floor(Date.now() / 1000)
+                }),
+            });
 
-            await tx.wait();
+            if (!response.ok) {
+                throw new Error('Failed to post to IPFS');
+            }
+
+            const { ipfsHash } = await response.json();
+
+            const proposalResponse = await fetch('/api/proposal', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ipfsHash,
+                    creator: account,
+                    restrictDomain,
+                }),
+            });
+
+            const { data } = await proposalResponse.json();
+
+
+
+            if (!proposalResponse.ok) {
+                throw new Error('Failed to create proposal');
+            }
+
             await fetchProposals();
-        } catch (err) {
-            setError('Failed to create proposal');
+        } catch (err: any) {
+            setError(err.message);
             console.error(err);
         } finally {
             setLoading(false);
@@ -76,14 +96,16 @@ const Listing = () => {
             const proposalsArray = await contract.getAllProposals();
             const formattedProposals = proposalsArray.map((proposal: any) => ({
                 ipfsHash: proposal.ipfsHash,
-                title: proposal.title,
                 votedYes: parseInt(proposal.votedYes.toString(), 10),
                 votedNo: parseInt(proposal.votedNo.toString(), 10),
                 endTime: proposal.endTime, // TODO: Convert timestamp to human-readable format
-                executed: proposal.executed,
+                restrictDomain: proposal.restrictDomain,
             }));
-            // fetchPinataProposals(formattedProposals);
-            setProposals(formattedProposals);
+            const fullProposals = fetchPinataProposals(formattedProposals);
+            const proposalData = await Promise.all(fullProposals);
+       
+            console.log(proposalData);
+            setProposals(proposalData);
         } catch (err) {
             setError('Failed to fetch proposals')
             console.error(err)
@@ -107,9 +129,29 @@ const Listing = () => {
         }
     };
 
+    const fetchPinataProposals = (proposals: Proposal[]): Promise<Proposal>[] => {
+        const fullProposals =  proposals.map(async (proposal) => {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_PINATA_GATEWAY}/ipfs/${proposal.ipfsHash}`, {
+                method: 'GET'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch proposals from Pinata');
+            }
+            
+            const  data = await response.text().then(data => JSON.parse(data));
+            const updatedProposal = { ...proposal, description: data.description, title: data.title, creator: data.creator, startTime: data.startTime, timestamp: data.timestamp };
+            
+            console.log(updatedProposal);
+            
+            return updatedProposal as Proposal;
+        });
+        return  fullProposals;
+    }
+
     return (
         <>
-        Listing
+            Listing
             {isLoggedIn && (
                 <>
                     <Typography variant="subtitle1" sx={{ mb: 2 }}>
@@ -189,10 +231,11 @@ const Listing = () => {
                                     <Typography variant="h6">{proposal.title}</Typography>
                                     <Typography variant="body2" color="text.secondary">
                                         <strong>Title:</strong> {proposal.title} <br />
-                                        <strong>ID</strong> {proposal.ipfsHash} <br />
+                                        <strong>Description:</strong> {proposal.description} <br />
+                                        <strong>Piñata Object ID</strong> {proposal.ipfsHash} <br />
                                         <strong>Votes For:</strong> {proposal.votedYes} <br />
                                         <strong>Votes Against:</strong> {proposal.votedNo} <br />
-                                        <strong>Executed:</strong> {proposal.executed ? 'Yes' : 'No'}
+                                        <strong>Executed:</strong> {proposal.endTime > new Date().getTime()? 'Yes' : 'No'}
                                     </Typography>
                                     <Box sx={{ mt: 2 }}>
                                         <Button

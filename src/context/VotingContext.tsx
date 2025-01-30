@@ -40,6 +40,15 @@ function votingReducer(state: VotingState, action: VotingAction): VotingState {
             return { ...state, jwt: action.payload };
         case 'SET_IS_LOGGED_IN':
             return { ...state, isLoggedIn: action.payload };
+        case 'LOGOUT':
+            return {
+                ...state,
+                account: "",
+                jwt: null,
+                isLoggedIn: false,
+                isAdmin: false,
+                contract: null
+            };
         default:
             return state;
     }

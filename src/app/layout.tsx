@@ -1,9 +1,13 @@
-import type { Metadata } from 'next'
+'use client'
 
-export const metadata: Metadata = {
-    title: 'UniTn Voting Platform',
-    description: 'A blockchain-based voting platform for the University of Trento',
-  }
+import { WagmiProvider } from 'wagmi'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { VotingProvider } from '../context/VotingContext'
+import { config } from '../config/wagmi'
+import App from '../App'
+
+const queryClient = new QueryClient()
+
 
 export default function RootLayout({
     children,
@@ -12,10 +16,15 @@ export default function RootLayout({
   }) {
     return (
       <html lang="en">
-        <head>
-        </head>
         <body>
-          <div id="root">{children}</div>
+          <WagmiProvider config={config}>
+            <QueryClientProvider client={queryClient}>
+              <VotingProvider>
+                <App />
+                {children}
+              </VotingProvider>
+            </QueryClientProvider>
+          </WagmiProvider>
         </body>
       </html>
     )

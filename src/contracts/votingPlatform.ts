@@ -18,14 +18,40 @@ export interface Voter {
 export const CONTRACT_ABI = [
   // Admin Management
   {
-    "inputs": [
+    inputs: [
       {
-        "internalType": "address",
-        "name": "_account",
-        "type": "address"
+        internalType: "address",
+        name: "_account",
+        type: "address"
       }
     ],
-    "name": "isAdmin",
+    name: "isAdmin",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool"
+      }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    "inputs": [],
+    "name": "getContractBalance",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "isOwner",
     "outputs": [
       {
         "internalType": "bool",
@@ -86,6 +112,13 @@ export const CONTRACT_ABI = [
     stateMutability: "view",
     type: "function"
   },
+  {
+    "inputs": [],
+    "name": "withdrawFees",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
 
   // Domain Management
   {
@@ -108,7 +141,7 @@ export const CONTRACT_ABI = [
     ],
     "name": "addDomain",
     "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "payable",
     "type": "function"
   },
   {
@@ -136,33 +169,27 @@ export const CONTRACT_ABI = [
     "type": "function"
   },
   {
-    inputs: [
-      { internalType: "string", name: "_domain", type: "string" }
+    "inputs": [],
+    "name": "getDomains",
+    "outputs": [
+      {
+        "internalType": "string[]",
+        "name": "",
+        "type": "string[]"
+      }
     ],
-    name: "isDomainRegistered",
-    outputs: [
-      { internalType: "bool", name: "", type: "bool" }
-    ],
-    stateMutability: "view",
-    type: "function"
+    "stateMutability": "view",
+    "type": "function"
   },
-  {
-    inputs: [],
-    name: "getDomains",
-    outputs: [{ internalType: "string[]", name: "", type: "string[]" }],
-    stateMutability: "view",
-    type: "function"
-  },
-
   // Proposal Management
   {
     inputs: [
       { internalType: "string", name: "_ipfsHash", type: "string" },
-      { internalType: "string", name: "_title", type: "string" },
+      { internalType: "address", name: "_voterAddress", type: "address" },
       { internalType: "bool", name: "_restrictToDomain", type: "bool" }
     ],
     name: "createProposal",
-    outputs: [{ internalType: "string", name: "", type: "string" }],
+    outputs: [{ internalType: "string", name: "_ipfsHash", type: "string" }],
     stateMutability: "nonpayable",
     type: "function"
   },
@@ -172,12 +199,11 @@ export const CONTRACT_ABI = [
     outputs: [{
       components: [
         { internalType: "string", name: "ipfsHash", type: "string" },
-        { internalType: "string", name: "title", type: "string" },
         { internalType: "uint256", name: "votedYes", type: "uint256" },
         { internalType: "uint256", name: "votedNo", type: "uint256" },
         { internalType: "uint256", name: "endTime", type: "uint256" },
-        { internalType: "bool", name: "executed", type: "bool" },
-        { internalType: "string", name: "domain", type: "string" }
+        { internalType: "string", name: "domain", type: "string" },
+        { internalType: "bool", name: "restrictDomain", type: "bool" }  
       ],
       internalType: "struct VotingPlatform.Proposal[]",
       name: "",
