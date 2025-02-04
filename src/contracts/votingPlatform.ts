@@ -148,6 +148,19 @@ export const CONTRACT_ABI = [
     "inputs": [
       {
         "internalType": "string",
+        "name": "_domain",
+        "type": "string"
+      }
+    ],
+    "name": "renewDomain",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
         "name": "_userDomain",
         "type": "string"
       },
@@ -240,14 +253,29 @@ export const CONTRACT_ABI = [
 
   // JWT validator
   {
-    inputs: [
-      { internalType: "string", name: "kid", type: "string" },
-      { internalType: "bytes", name: "modulus", type: "bytes" }
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "kid",
+            "type": "string"
+          },
+          {
+            "internalType": "bytes",
+            "name": "modulus",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct JWTValidator.GoogleModule[]",
+        "name": "googleModule",
+        "type": "tuple[]"
+      }
     ],
-    name: "addModulus",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function"
+    "name": "addModulus",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
     inputs: [],

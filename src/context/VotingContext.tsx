@@ -46,8 +46,7 @@ function votingReducer(state: VotingState, action: VotingAction): VotingState {
                 account: "",
                 jwt: null,
                 isLoggedIn: false,
-                isAdmin: false,
-                contract: null
+                isAdmin: false
             };
         default:
             return state;

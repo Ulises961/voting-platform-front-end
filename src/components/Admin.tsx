@@ -110,7 +110,8 @@ const Admin = () => {
         try {
             // TODO: IMPLEMENT SINGLE TRANSACTION TO AVOID CREATING QUEUES
             dispatch({ type: "SET_LOADING", payload: true })
-            for (const jwt of requiresUpdate) {
+
+            const payload = requiresUpdate.map(jwt => {
                 const modulus = jwt.n;
                 const parsed = base64UrlToHex(modulus)
                 //console.log("Adding modulus:", parsed, jwt.kid);
@@ -120,11 +121,12 @@ const Admin = () => {
                     throw new Error('Modulus too large');
                 }
 
-                const tx = await contract.addModulus(jwt.kid, parsed, { gasLimit: 500000 })
-                await tx.wait()
-            }
+                return {kid: jwt.kid, modulus: parsed};
+            });
+            const tx = await contract.addModulus(payload)
+            await tx.wait()
+            
             setRequiresUpdate([])
-            //await fetchProposals()
         } catch (err) {
             handleError('Failed to update moduli')
             console.error("Failed to update moduli", err)
@@ -161,14 +163,16 @@ const Admin = () => {
 
         contract.withdrawFees()
             .then((tx) => {
-                console.log('Withdraw Balance:', tx);
+                console.log('Withdrawn Balance:', tx);
+                setBalance(0);
             })
             .catch((err) => {
                 console.error('Error withdrawing balance:', err);
             });
     };
 
-    useEffect(() => {
+
+    const getBalance = () => {
         if (!contract) {
             return;
         }
@@ -180,6 +184,12 @@ const Admin = () => {
             .catch((err) => {
                 console.error('Error fetching balance:', err);
             });
+
+    }
+
+
+    useEffect(() => {
+        getBalance();
     });
 
     return (<>

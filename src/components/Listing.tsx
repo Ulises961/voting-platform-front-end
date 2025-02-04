@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 declare global {
     interface Window {
@@ -15,6 +15,7 @@ import {
     CircularProgress,
     Paper,
     Switch,
+    Stack,
 } from '@mui/material';
 import { Proposal } from '../types/interfaces';
 import { useVoting } from '../context/VotingContext';
@@ -101,10 +102,10 @@ const Listing = () => {
                 endTime: proposal.endTime, // TODO: Convert timestamp to human-readable format
                 restrictDomain: proposal.restrictDomain,
             }));
+
             const fullProposals = fetchPinataProposals(formattedProposals);
             const proposalData = await Promise.all(fullProposals);
-       
-            console.log(proposalData);
+
             setProposals(proposalData);
         } catch (err) {
             setError('Failed to fetch proposals')
@@ -113,7 +114,7 @@ const Listing = () => {
             setLoading(false)
         }
     }
-
+    
     const castVote = async (proposalId: string, support: boolean) => {
         if (!contract) return;
 
@@ -130,7 +131,7 @@ const Listing = () => {
     };
 
     const fetchPinataProposals = (proposals: Proposal[]): Promise<Proposal>[] => {
-        const fullProposals =  proposals.map(async (proposal) => {
+        const fullProposals = proposals.map(async (proposal) => {
             const response = await fetch(`${process.env.NEXT_PUBLIC_PINATA_GATEWAY}/ipfs/${proposal.ipfsHash}`, {
                 method: 'GET'
             });
@@ -138,79 +139,85 @@ const Listing = () => {
             if (!response.ok) {
                 throw new Error('Failed to fetch proposals from Pinata');
             }
-            
-            const  data = await response.text().then(data => JSON.parse(data));
+
+            const data = await response.text().then(data => JSON.parse(data));
             const updatedProposal = { ...proposal, description: data.description, title: data.title, creator: data.creator, startTime: data.startTime, timestamp: data.timestamp };
-            
+
             console.log(updatedProposal);
-            
+
             return updatedProposal as Proposal;
         });
-        return  fullProposals;
+        return fullProposals;
     }
+
+    useEffect(() => {
+        if (isLoggedIn) {
+            fetchProposals();
+        }
+    }, [isLoggedIn]);
+    
 
     return (
         <>
-            Listing
             {isLoggedIn && (
                 <>
-                    <Typography variant="subtitle1" sx={{ mb: 2 }}>
-                        Connected: {account}
-                    </Typography>
-
                     {/* Proposal Creation Form */}
                     <Paper sx={{ p: 2, mb: 2 }}>
                         <Card sx={{ mb: 2 }}>
                             <CardContent>
-                                <Typography variant="h6" gutterBottom>
-                                    Create New Proposal
-                                </Typography>
-                                <Box component="form" sx={{ '& > *': { mb: 2 } }}>
-                                    <TextField
-                                        fullWidth
-                                        label="Title"
-                                        value={newProposal.title}
-                                        onChange={(e) => setNewProposal({
-                                            ...newProposal,
-                                            title: e.target.value
-                                        })}
-                                    />
-                                    <TextField
-                                        fullWidth
-                                        multiline
-                                        rows={4}
-                                        label="Description"
-                                        value={newProposal.description}
-                                        onChange={(e) => setNewProposal({
-                                            ...newProposal,
-                                            description: e.target.value
-                                        })}
-                                    />
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Typography>Restrict Domain:</Typography>
-                                        <Switch
-                                            checked={restrictDomain}
-                                            onChange={(e) => setRestrictDomain(e.target.checked)}
-                                        />
+                                <Stack spacing={2}>
+                                    <Typography variant="h6" gutterBottom>
+                                        Create New Proposal
+                                    </Typography>
+                                    <Box component="form" sx={{ '& > *': { mb: 2 } }}>
+                                        <Stack spacing={2}>
+                                            <TextField
+                                                fullWidth
+                                                label="Title"
+                                                value={newProposal.title}
+                                                onChange={(e) => setNewProposal({
+                                                    ...newProposal,
+                                                    title: e.target.value
+                                                })}
+                                            />
+                                            <TextField
+                                                fullWidth
+                                                multiline
+                                                rows={4}
+                                                label="Description"
+                                                value={newProposal.description}
+                                                onChange={(e) => setNewProposal({
+                                                    ...newProposal,
+                                                    description: e.target.value
+                                                })}
+                                            />
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Typography>Restrict Domain:</Typography>
+                                                <Switch
+                                                    checked={restrictDomain}
+                                                    onChange={(e) => setRestrictDomain(e.target.checked)}
+                                                />
+                                            </Box>
+                                            <TextField
+                                                type="datetime-local"
+                                                label="Start Time"
+                                                value={new Date(newProposal.startTime * 1000).toISOString().slice(0, 16)}
+                                                onChange={(e) => setNewProposal({
+                                                    ...newProposal,
+                                                    startTime: Math.floor(new Date(e.target.value).getTime() / 1000)
+                                                })}
+                                                fullWidth
+                                            />
+                                            <Button
+                                                variant="contained"
+                                                onClick={createProposal}
+                                                disabled={loading || !account || !newProposal.title.trim() || !newProposal.description.trim()}
+                                            >
+                                                {loading ? <CircularProgress size={24} /> : 'Create Proposal'}
+                                            </Button>
+                                        </Stack>
                                     </Box>
-                                    <TextField
-                                        type="datetime-local"
-                                        label="Start Time"
-                                        value={new Date(newProposal.startTime * 1000).toISOString().slice(0, 16)}
-                                        onChange={(e) => setNewProposal({
-                                            ...newProposal,
-                                            startTime: Math.floor(new Date(e.target.value).getTime() / 1000)
-                                        })}
-                                        fullWidth
-                                    />
-                                    <Button
-                                        variant="contained"
-                                        onClick={createProposal}
-                                        disabled={loading || !account || !newProposal.title.trim() || !newProposal.description.trim()}
-                                    >
-                                        {loading ? <CircularProgress size={24} /> : 'Create Proposal'}
-                                    </Button>
-                                </Box>
+                                </Stack>
                             </CardContent>
                         </Card>
                     </Paper>
@@ -228,41 +235,44 @@ const Listing = () => {
                         {proposals.map((proposal, index) => (
                             <Card key={index} sx={{ mb: 2 }}>
                                 <CardContent>
-                                    <Typography variant="h6">{proposal.title}</Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        <strong>Title:</strong> {proposal.title} <br />
-                                        <strong>Description:</strong> {proposal.description} <br />
-                                        <strong>Piñata Object ID</strong> {proposal.ipfsHash} <br />
-                                        <strong>Votes For:</strong> {proposal.votedYes} <br />
-                                        <strong>Votes Against:</strong> {proposal.votedNo} <br />
-                                        <strong>Executed:</strong> {proposal.endTime > new Date().getTime()? 'Yes' : 'No'}
-                                    </Typography>
-                                    <Box sx={{ mt: 2 }}>
-                                        <Button
-                                            variant="contained"
-                                            color="success"
-                                            onClick={() => castVote(proposal.ipfsHash, true)}
-                                            disabled={loading}
-                                            sx={{ mr: 1 }}
-                                        >
-                                            Vote For
-                                        </Button>
-                                        <Button
-                                            variant="contained"
-                                            color="error"
-                                            onClick={() => castVote(proposal.ipfsHash, false)}
-                                            disabled={loading}
-                                        >
-                                            Vote Against
-                                        </Button>
-                                    </Box>
+                                    <Stack spacing={2} sx={{ mb: 2 }}>
+                                        <Typography variant="h6">{proposal.title}</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            <strong>Title:</strong> {proposal.title} <br />
+                                            <strong>Description:</strong> {proposal.description} <br />
+                                            <strong>Piñata Object ID</strong> {proposal.ipfsHash} <br />
+                                            <strong>Votes For:</strong> {proposal.votedYes} <br />
+                                            <strong>Votes Against:</strong> {proposal.votedNo} <br />
+                                            <strong>Executed:</strong> {proposal.endTime > new Date().getTime() ? 'Yes' : 'No'}
+                                        </Typography>
+                                        <Box sx={{ mt: 2 }}>
+                                            <Button
+                                                variant="contained"
+                                                color="success"
+                                                onClick={() => castVote(proposal.ipfsHash, true)}
+                                                disabled={loading}
+                                                sx={{ mr: 1 }}
+                                            >
+                                                Vote For
+                                            </Button>
+                                            <Button
+                                                variant="contained"
+                                                color="error"
+                                                onClick={() => castVote(proposal.ipfsHash, false)}
+                                                disabled={loading}
+                                            >
+                                                Vote Against
+                                            </Button>
+                                        </Box>
+                                    </Stack>
                                 </CardContent>
                             </Card>
                         ))}
                     </Paper>
                 </>
 
-            )}
+            )
+            }
         </>
     );
 }

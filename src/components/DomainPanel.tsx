@@ -12,9 +12,6 @@ import {
     ListItem,
     ListItemText,
 } from '@mui/material';
-import { GoogleModule } from '../types/interfaces';
-import { useQuery } from "@tanstack/react-query"
-import RefreshIcon from '@mui/icons-material/Refresh';
 import { useVoting } from '../context/VotingContext';
 import { ethers } from 'ethers';
 
@@ -31,7 +28,7 @@ const DomainPanel = () => {
     const [newDomain, setNewDomain] = useState('');
     const [powerLevel, setPowerLevel] = useState('1');
     const [parentDomain, setParentDomain] = useState('');
-
+    const [renewDomain, setRenewDomain] = useState('');
 
     const handleError = (err: any) => {
         dispatch({ type: 'SET_ERROR', payload: err });
@@ -59,13 +56,14 @@ const DomainPanel = () => {
     const fetchApprovedDomains = async () => {
         if (!contract) return;
         try {
+            console.log("fetchApprovedDomains");
             const domains = await contract.getDomains();
+            console.log("domains", domains);
             setApprovedDomains(domains);
         } catch (err) {
             console.error('Error fetching domains:', err);
         }
     };
-
 
     const base64UrlToHex = (n: string): `0x${string}` => {
         try {
@@ -91,6 +89,20 @@ const DomainPanel = () => {
         setPowerLevel('1');
     };
 
+
+    const handleRenewDomain = async () => {
+        if (!contract) return;
+        try {
+            console.log("renewDomain", renewDomain);
+            const tx = await contract.renewDomain(renewDomain, { value: REGISTRATION_FEE });
+            await tx.wait();
+            fetchApprovedDomains();
+        } catch (err) {
+            handleError(err);
+            console.error(err);
+        }
+        setRenewDomain('');
+    };
 
     return (<>
         <Paper sx={{ p: 2, mb: 2 }}>
@@ -124,10 +136,24 @@ const DomainPanel = () => {
                 >
                     Add Domain ({process.env.NEXT_PUBLIC_DOMAIN_REGISTRATION_FEE} ETH)
                 </Button>
+                <TextField
+                    label="domain"
+                    value={renewDomain}
+                    onChange={(e) => setRenewDomain(e.target.value)}
+                    placeholder="e.g. studenti.unitn.it"
+                />
+                <Button
+                    variant="contained"
+                    onClick={handleRenewDomain}
+                    disabled={!renewDomain || loading}
+                >
+                    Renew Domain ({process.env.NEXT_PUBLIC_DOMAIN_REGISTRATION_FEE} ETH)
+                </Button>
             </Box>
             <Typography variant="subtitle2">
                 Approved Domains:
             </Typography>
+            <button onClick={fetchApprovedDomains}>Refresh</button>
             <List>
                 {approvedDomains.map((domain, index) => (
                     <ListItem key={index}>

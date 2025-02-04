@@ -39,17 +39,13 @@ export default function Navigation() {
                     }
                 </Box>
                 <Box>
-                    {account && (
-                        isLoggedIn ? (
+                    {
+                        (isLoggedIn || jwt || account) && (
                             <Button color="inherit" onClick={handleLogout}>
                                 Logout
                             </Button>
-                        ) : (
-                            <Button color="inherit" onClick={() => router.push('/login')}>
-                                Login
-                            </Button>
                         )
-                    )}
+                    }
                 </Box>
             </Toolbar>
         </AppBar>

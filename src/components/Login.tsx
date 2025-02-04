@@ -33,7 +33,7 @@ const Login = () => {
       const { header, payload, hexSig } = parseJwt(jwt as string);
       await contract.registerWithDomain(header, payload, hexSig);
       dispatch({ type: 'SET_IS_REGISTERED', payload: true });
-      
+      setIsLoggedIn(true);
     } catch (err) {
       console.error('Registration error:', err);
       handleError('Failed to process request');
@@ -59,20 +59,9 @@ const Login = () => {
       return;
     }
   };
-  
-  // const checkAdmin = async () => {
-  //   if (!contract || !account) return;
-  //   try {
-  //       const isAdminResult = await contract.isAdmin(account);
-  //       console.log('isAdminResult:', isAdminResult);
-  //       dispatch({type: "SET_IS_ADMIN", payload: isAdminResult});
-  //   } catch (err) {
-  //       console.error('Error checking admin:', err);
-  //   }
-  // };
+
 
     useEffect(() => {
-      //checkAdmin();
       checkUserRegistration();
     }, [account, contract]);
 
@@ -89,7 +78,6 @@ const Login = () => {
             return addresses.includes(account);
         });
         // If the user is not registered, register them
-        console.log('isRegistered:', isRegistered);
         dispatch({ type: 'SET_IS_REGISTERED', payload: isRegistered });
 
     }
