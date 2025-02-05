@@ -65,6 +65,7 @@ export interface VotingState {
   proposals: Proposal[];
   loading: boolean;
   error: string | null;
+  domain: string;
 }
 
 export interface VotingContextType extends VotingState {
@@ -84,6 +85,7 @@ export type VotingAction =
   | { type: 'SET_JWT'; payload: string | null }
   | { type: 'SET_IS_LOGGED_IN'; payload: boolean }
   | { type: 'LOGOUT';  payload: undefined }
+  | { type: 'SET_DOMAIN'; payload: string }
   ;
 
 

@@ -38,7 +38,7 @@ const DomainPanel = () => {
 
     const addDomain = async (domain: string, powerLevel: number, parentDomain: string) => {
         if (!contract) return;
-        console.log("contract", contract);
+        
         try {
             const tx = await contract.addDomain(domain, powerLevel, parentDomain,
                 {
@@ -56,29 +56,12 @@ const DomainPanel = () => {
     const fetchApprovedDomains = async () => {
         if (!contract) return;
         try {
-            console.log("fetchApprovedDomains");
+            
             const domains = await contract.getDomains();
-            console.log("domains", domains);
+            
             setApprovedDomains(domains);
         } catch (err) {
             console.error('Error fetching domains:', err);
-        }
-    };
-
-    const base64UrlToHex = (n: string): `0x${string}` => {
-        try {
-            const bytes = Base64.toUint8Array(n.replace(/-/g, '+').replace(/_/g, '/'));
-            const hex = Array.from<number>(bytes)
-                .map(b => b.toString(16).padStart(2, '0'))
-                .join('');
-            // Ensure the hex string is valid
-            if (!/^[0-9a-f]+$/i.test(hex)) {
-                throw new Error('Invalid hex string generated');
-            }
-            return `0x${hex}`;
-        } catch (error) {
-            console.error('Error converting base64URL to hex:', error);
-            throw error;
         }
     };
 
@@ -93,7 +76,7 @@ const DomainPanel = () => {
     const handleRenewDomain = async () => {
         if (!contract) return;
         try {
-            console.log("renewDomain", renewDomain);
+            
             const tx = await contract.renewDomain(renewDomain, { value: REGISTRATION_FEE });
             await tx.wait();
             fetchApprovedDomains();
@@ -153,7 +136,7 @@ const DomainPanel = () => {
             <Typography variant="subtitle2">
                 Approved Domains:
             </Typography>
-            <button onClick={fetchApprovedDomains}>Refresh</button>
+            <Button variant="contained" onClick={fetchApprovedDomains}>Refresh</Button>
             <List>
                 {approvedDomains.map((domain, index) => (
                     <ListItem key={index}>

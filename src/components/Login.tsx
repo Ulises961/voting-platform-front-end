@@ -13,6 +13,10 @@ const Login = () => {
     dispatch({ type: 'SET_ERROR', payload: err });
   }
 
+  const setDomain = (domain: string) => {
+    dispatch({ type: 'SET_DOMAIN', payload: domain });
+  }
+  
   const setIsLoggedIn = (isLoggedIn: boolean) => {
     dispatch({ type: 'SET_IS_LOGGED_IN', payload: isLoggedIn });
   }
@@ -31,11 +35,13 @@ const Login = () => {
             
     try {
       const { header, payload, hexSig } = parseJwt(jwt as string);
-      console.log('header:', header);
-      console.log('payload:', payload);
-      console.log('hexSig:', hexSig);
+      
+      setDomain(JSON.parse(payload).email.split('@')[1]);
+      
       await contract.registerWithDomain(header, payload, hexSig);
+      
       dispatch({ type: 'SET_IS_REGISTERED', payload: true });
+
       setIsLoggedIn(true);
     } catch (err) {
       console.error('Registration error:', err);
@@ -53,6 +59,7 @@ const Login = () => {
 
     try {
       const { header, payload, hexSig } = parseJwt(jwt as string);
+
       const tx = await contract.login(header, payload, hexSig);
       setIsLoggedIn(tx);
     } catch (err) {
@@ -70,11 +77,11 @@ const Login = () => {
 
     const checkUserRegistration = async () => {
         if (!contract) return;
-        console.log("checking registration");
+        
         // Get the list of events with the VoterRegistered event so we can check if the user is registered
         const voterRegisteredFilter = contract.filters.VoterRegistered()
         const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
-        console.log('voterRegisteredEvents:', voterRegisteredEvents);
+        
         // Check if the user is registered
         const isRegistered = voterRegisteredEvents.some((event: any) => {
             const addresses: Array<string> = event.args?.map((address: string) => address.toLowerCase());
@@ -84,10 +91,6 @@ const Login = () => {
         dispatch({ type: 'SET_IS_REGISTERED', payload: isRegistered });
 
     }
-
-  console.log('isRegistered', isRegistered);
-  console.log('isLoggedIn', isLoggedIn);
-  console.log('jwt', jwt);
 
   return (
     <>

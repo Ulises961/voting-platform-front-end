@@ -30,7 +30,6 @@ export async function POST(req: Request) {
 async function pinToIPFS(metadata: ProposalMetadata): Promise<string> {
     // Implementation for pinning data to IPFS
     // This should interact with your IPFS service
-    console.log('Pinning to IPFS:', metadata);
     const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
         method: 'POST',
         headers: {

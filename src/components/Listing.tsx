@@ -1,10 +1,4 @@
 import { useEffect, useState } from 'react';
-
-declare global {
-    interface Window {
-        ethereum?: any;
-    }
-}
 import {
     Button,
     Card,
@@ -20,9 +14,14 @@ import {
 import { Proposal } from '../types/interfaces';
 import { useVoting } from '../context/VotingContext';
 
+declare global {
+    interface Window {
+        ethereum?: any;
+    }
+}
 
 const Listing = () => {
-    const { contract, account, isLoggedIn, loading, dispatch, } = useVoting();
+    const { contract, account, isLoggedIn, loading, dispatch, domain } = useVoting();
     const [newProposal, setNewProposal] = useState({
         title: '',
         description: '',
@@ -69,12 +68,9 @@ const Listing = () => {
                     ipfsHash,
                     creator: account,
                     restrictDomain,
+                    domain
                 }),
             });
-
-            const { data } = await proposalResponse.json();
-
-
 
             if (!proposalResponse.ok) {
                 throw new Error('Failed to create proposal');
@@ -143,7 +139,6 @@ const Listing = () => {
             const data = await response.text().then(data => JSON.parse(data));
             const updatedProposal = { ...proposal, description: data.description, title: data.title, creator: data.creator, startTime: data.startTime, timestamp: data.timestamp };
 
-            console.log(updatedProposal);
 
             return updatedProposal as Proposal;
         });
@@ -156,7 +151,6 @@ const Listing = () => {
         }
     }, [isLoggedIn]);
     
-
     return (
         <>
             {isLoggedIn && (
@@ -270,7 +264,6 @@ const Listing = () => {
                         ))}
                     </Paper>
                 </>
-
             )
             }
         </>

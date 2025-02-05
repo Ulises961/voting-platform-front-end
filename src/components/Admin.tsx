@@ -1,4 +1,3 @@
-
 // VotingPlatform.tsx
 import { useState, useEffect } from 'react';
 import { Base64 } from 'js-base64';
@@ -35,14 +34,12 @@ const Admin = () => {
 
     // USE EFFECT TO UPDATE MODULI IF ISADMIN == TRUE 
     useEffect(() => {
-        console.log('States updated:', {
             hasContract: !!contract,
             hasAccount: !!account,
             hasLatestSigners: !!latestSigners
         });
         if (contract && account && latestSigners) {
             checkAdminAndModuli();
-            // checkUserRegistration();
         }
     }, [contract, account, latestSigners]);
 
@@ -67,9 +64,7 @@ const Admin = () => {
                 for (const jwt of latestSigners.keys) {
                     const modulus = jwt.n;
                     const parsed = base64UrlToHex(modulus);
-                    console.log('Checking modulus:', parsed);
-                    console.log('Current moduli:', jwt.kid);
-                    if (!currentModuli.includes(parsed)) {
+                   if (!currentModuli.includes(parsed)) {
                         updatesRequired.push(jwt);
                     }
                 }
@@ -87,7 +82,6 @@ const Admin = () => {
         if (!contract || !latestSigners) {
             return
         }
-        //console.log("Getting required update: Latest signers: ", latestSigners)
         const updatesRequired: GoogleModule[] = []
         try {
             const currentModuli = await contract.getAllModuli();
@@ -116,7 +110,6 @@ const Admin = () => {
             const payload = requiresUpdate.map(jwt => {
                 const modulus = jwt.n;
                 const parsed = base64UrlToHex(modulus)
-                //console.log("Adding modulus:", parsed, jwt.kid);
 
                 // Add size validation
                 if (modulus.length > 514) { // 0x + 512 hex chars
@@ -165,7 +158,6 @@ const Admin = () => {
 
         contract.withdrawFees()
             .then((tx) => {
-                console.log('Withdrawn Balance:', tx);
                 setBalance(0);
             })
             .catch((err) => {

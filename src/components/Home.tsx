@@ -8,12 +8,8 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { VotingPlatformProps } from '../types/interfaces';
 import { fromHex } from 'viem';
 import { useVoting } from '../context/VotingContext';
-import Admin from './Admin';
 import Listing from './Listing';
 import Login from './Login';
-import Navigation from './Navigation';
-
-
 
 declare global {
     interface Window {
@@ -49,7 +45,6 @@ const Home: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) =
     };
 
     const setJWT = (jwt: string) => {
-        console.log('Setting JWT:', jwt);
         dispatch({ type: 'SET_JWT', payload: jwt });
     };
 
@@ -70,7 +65,6 @@ const Home: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) =
                 );
 
                 setAccount(accounts[0]);
-                console.log('Connected account:', accounts[0]);
                 setContract(votingContract);
 
             } else {
@@ -86,7 +80,6 @@ const Home: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) =
         if (!contract || !account) return;
         try {
             const isAdminResult = await contract.isOwner();
-            console.log('isAdminResult:', isAdminResult);
             setIsAdmin(isAdminResult);
         } catch (err) {
             console.error('Error checking admin:', err);
@@ -110,10 +103,7 @@ const Home: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) =
 
 
     const handleGoogleLogin = async (credentialResponse: any) => {
-        //console.log("handleLogin", credentialResponse);
-
         if (credentialResponse.credential) {
-            //console.log("credentialResponse.credential", credentialResponse.credential);
 
             if (!contract || !account) {
                 handleError('Please connect your wallet first');
