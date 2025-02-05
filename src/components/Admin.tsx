@@ -34,10 +34,6 @@ const Admin = () => {
 
     // USE EFFECT TO UPDATE MODULI IF ISADMIN == TRUE 
     useEffect(() => {
-            hasContract: !!contract,
-            hasAccount: !!account,
-            hasLatestSigners: !!latestSigners
-        });
         if (contract && account && latestSigners) {
             checkAdminAndModuli();
         }
@@ -64,7 +60,8 @@ const Admin = () => {
                 for (const jwt of latestSigners.keys) {
                     const modulus = jwt.n;
                     const parsed = base64UrlToHex(modulus);
-                   if (!currentModuli.includes(parsed)) {
+                 
+                    if (!currentModuli.includes(parsed)) {
                         updatesRequired.push(jwt);
                     }
                 }
@@ -82,6 +79,7 @@ const Admin = () => {
         if (!contract || !latestSigners) {
             return
         }
+        
         const updatesRequired: GoogleModule[] = []
         try {
             const currentModuli = await contract.getAllModuli();
