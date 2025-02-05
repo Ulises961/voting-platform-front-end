@@ -3,24 +3,19 @@ import * as isIPFS from 'is-ipfs';
 import { ethers } from 'ethers';
 import { CONTRACT_ABI } from '../../../contracts/votingPlatform';
 import { ProposalParams } from '@/types/interfaces';
-import { useState } from 'react';
 
 const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
- 
+
 export async function POST(request: Request) {
     const { ipfsHash, creator, restrictDomain, domain } = await request.json();
-    const [domainProposals, setDomainProposals] = useState<Map<string, number>>(new Map());
+    const domainProposals: Map<string, number> = new Map();
     const domainProposalsNumber = domainProposals.get(domain) || 0;
-    
-    if(domainProposalsNumber > parseInt(process.env.BACKEND_DOMAIN_LIMIT!)) {
-        return NextResponse.json({ error: 'Domain limit reached' }, { status: 400 });   
-    } 
 
-    setDomainProposals(prev => {
-        const newDomainProposals = new Map(prev);
-        newDomainProposals.set(domain, domainProposalsNumber + 1);
-        return newDomainProposals;
-    });
+    if (domainProposalsNumber > parseInt(process.env.BACKEND_DOMAIN_LIMIT!)) {
+        return NextResponse.json({ error: 'Domain limit reached' }, { status: 400 });
+    }
+
+    domainProposals.set(domain, domainProposalsNumber + 1);
 
     // Validate input
     const validationError = validateProposalInput({ ipfsHash, creator, restrictDomain } as ProposalParams);
@@ -31,17 +26,17 @@ export async function POST(request: Request) {
     try {
         // Connect to the blockchain network
         const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
-        
+
         // Get the signer using the creator's address
         const signer = await provider.getSigner(process.env.BACKEND_WALLET_ADDRESS);
-        
+
         // Create contract instance
         const contract = new ethers.Contract(
             contractAddress as string,
             CONTRACT_ABI,
             signer
         );
-       
+
         // Send proposal to the smart contract
         const tx = await contract.createProposal(ipfsHash, creator, restrictDomain);
         const receipt = await tx.wait();
