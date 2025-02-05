@@ -49,6 +49,7 @@ const Home: React.FC<VotingPlatformProps> = ({ contractAddress, contractABI }) =
     };
 
     const setJWT = (jwt: string) => {
+        console.log('Setting JWT:', jwt);
         dispatch({ type: 'SET_JWT', payload: jwt });
     };
 

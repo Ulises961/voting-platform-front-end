@@ -31,6 +31,9 @@ const Login = () => {
             
     try {
       const { header, payload, hexSig } = parseJwt(jwt as string);
+      console.log('header:', header);
+      console.log('payload:', payload);
+      console.log('hexSig:', hexSig);
       await contract.registerWithDomain(header, payload, hexSig);
       dispatch({ type: 'SET_IS_REGISTERED', payload: true });
       setIsLoggedIn(true);

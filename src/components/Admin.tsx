@@ -67,6 +67,8 @@ const Admin = () => {
                 for (const jwt of latestSigners.keys) {
                     const modulus = jwt.n;
                     const parsed = base64UrlToHex(modulus);
+                    console.log('Checking modulus:', parsed);
+                    console.log('Current moduli:', jwt.kid);
                     if (!currentModuli.includes(parsed)) {
                         updatesRequired.push(jwt);
                     }
