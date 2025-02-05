@@ -1,50 +1,70 @@
-# React + TypeScript + Vite
+# my-nextjs-app/README.md
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# My Next.js App
 
-Currently, two official plugins are available:
+This project is a Next.js application that allows users to create proposals and interact with IPFS and a smart contract. The application includes backend functions for posting validated and sanitized descriptions to IPFS and sending proposal data to the smart contract.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Project Structure
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
-
-- Configure the top-level `parserOptions` property like this:
-
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+```
+my-nextjs-app
+├── src
+│   ├── app
+│   │   ├── api
+│   │   │   ├── ipfs
+│   │   │   │   └── route.ts         # Backend function to post to IPFS
+│   │   │   └── proposal
+│   │   │       └── route.ts         # Backend function to send data to smart contract
+│   │   └── page.tsx                 # Main entry point for the application
+│   ├── components
+│   │   └── Listing.tsx               # React component for creating proposals
+│   ├── lib
+│   │   ├── ipfs.ts                   # Utility functions for IPFS interaction
+│   │   └── sanitize.ts               # Functions for sanitizing input data
+│   ├── types
+│   │   └── index.ts                  # TypeScript interfaces and types
+│   └── utils
+│       └── validation.ts             # Utility functions for validating input data
+├── package.json                       # npm configuration file
+├── tsconfig.json                     # TypeScript configuration file
+└── README.md                         # Project documentation
 ```
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+## Features
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+- Create proposals with a title and description.
+- Store proposal descriptions on IPFS.
+- Interact with a smart contract to manage proposals.
+- Input validation and sanitization to ensure data integrity and security.
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+## Getting Started
+
+1. Clone the repository:
+   ```
+   git clone <repository-url>
+   ```
+
+2. Navigate to the project directory:
+   ```
+   cd my-nextjs-app
+   ```
+
+3. Install dependencies:
+   ```
+   npm install
+   ```
+
+4. Run the development server:
+   ```
+   npm run dev
+   ```
+
+5. Open your browser and visit `http://localhost:3000` to view the application.
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for more details.

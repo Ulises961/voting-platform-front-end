@@ -1,62 +1,27 @@
-
 // VotingPlatform.tsx
 import { useState, useEffect } from 'react';
 import { Base64 } from 'js-base64';
-
-declare global {
-    interface Window {
-        ethereum?: any;
-    }
-}
 import {
     Button,
     TextField,
     Typography,
     Box,
     Paper,
-    List,
-    ListItem,
-    ListItemText,
 } from '@mui/material';
 import { GoogleModule } from '../types/interfaces';
 import { useQuery } from "@tanstack/react-query"
 import RefreshIcon from '@mui/icons-material/Refresh';
-
 import { useVoting } from '../context/VotingContext';
-
 
 // Admin component
 const Admin = () => {
-    const { contract, account, isAdmin, loading, dispatch, } = useVoting();
-    const [approvedDomains, setApprovedDomains] = useState<string[]>([]);
-    const [newDomain, setNewDomain] = useState('');
+    const { contract, account, dispatch } = useVoting();
     const [requiresUpdate, setRequiresUpdate] = useState<GoogleModule[]>([])
-    const [isRegistering, setIsRegistering] = useState<boolean>(false);
-    const [powerLevel, setPowerLevel] = useState('1');
-    const [parentDomain, setParentDomain] = useState('');
-
+    const [balance, setBalance] = useState<number>(0);
 
     const handleError = (err: any) => {
         dispatch({ type: 'SET_ERROR', payload: err });
     }
-
-    const checkUserRegistration = async () => {
-        if (!contract) return;
-        console.log("checking registration");
-        // Get the list of events with the VoterRegistered event so we can check if the user is registered
-        const voterRegisteredFilter = contract.filters.VoterRegistered()
-        const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
-        console.log('voterRegisteredEvents:', voterRegisteredEvents);
-        // Check if the user is registered
-        const isRegistered = voterRegisteredEvents.some((event: any) => {
-            const addresses: Array<string> = event.args?.map((address: string) => address.toLowerCase());
-            return addresses.includes(account);
-        });
-        // If the user is not registered, register them
-        dispatch({ type: 'SET_IS_REGISTERED', payload: isRegistered });
-        console.log('isRegistered:', isRegistered);
-    }
-
 
     const { data: latestSigners } = useQuery({
         queryKey: ["googlejwt"],
@@ -69,16 +34,10 @@ const Admin = () => {
 
     // USE EFFECT TO UPDATE MODULI IF ISADMIN == TRUE 
     useEffect(() => {
-        console.log('States updated:', {
-            hasContract: !!contract,
-            hasAccount: !!account,
-            hasLatestSigners: !!latestSigners
-        });
         if (contract && account && latestSigners) {
             checkAdminAndModuli();
-            checkUserRegistration();
         }
-    }, [contract, account, latestSigners, isRegistering]);
+    }, [contract, account, latestSigners]);
 
     useEffect(() => {
         getRequiresUpdate().catch(console.error)
@@ -91,7 +50,7 @@ const Admin = () => {
         }
 
         try {
-            const isAdminResult = await contract.admins(account);
+            const isAdminResult = await contract.isOwner();
             dispatch({ type: 'SET_IS_ADMIN', payload: isAdminResult });
 
             if (isAdminResult) {
@@ -101,6 +60,7 @@ const Admin = () => {
                 for (const jwt of latestSigners.keys) {
                     const modulus = jwt.n;
                     const parsed = base64UrlToHex(modulus);
+                 
                     if (!currentModuli.includes(parsed)) {
                         updatesRequired.push(jwt);
                     }
@@ -119,7 +79,7 @@ const Admin = () => {
         if (!contract || !latestSigners) {
             return
         }
-        //console.log("Getting required update: Latest signers: ", latestSigners)
+        
         const updatesRequired: GoogleModule[] = []
         try {
             const currentModuli = await contract.getAllModuli();
@@ -144,21 +104,22 @@ const Admin = () => {
         try {
             // TODO: IMPLEMENT SINGLE TRANSACTION TO AVOID CREATING QUEUES
             dispatch({ type: "SET_LOADING", payload: true })
-            for (const jwt of requiresUpdate) {
+
+            const payload = requiresUpdate.map(jwt => {
                 const modulus = jwt.n;
                 const parsed = base64UrlToHex(modulus)
-                //console.log("Adding modulus:", parsed, jwt.kid);
 
                 // Add size validation
                 if (modulus.length > 514) { // 0x + 512 hex chars
                     throw new Error('Modulus too large');
                 }
 
-                const tx = await contract.addModulus(jwt.kid, parsed, { gasLimit: 500000 })
-                await tx.wait()
-            }
+                return {kid: jwt.kid, modulus: parsed};
+            });
+            const tx = await contract.addModulus(payload)
+            await tx.wait()
+            
             setRequiresUpdate([])
-            //await fetchProposals()
         } catch (err) {
             handleError('Failed to update moduli')
             console.error("Failed to update moduli", err)
@@ -167,27 +128,7 @@ const Admin = () => {
         }
     }
 
-    const addDomain = async (domain: string, powerLevel: number, parentDomain: string) => {
-        if (!contract || !isAdmin) return;
-        try {
-            const tx = await contract.addDomain(domain, powerLevel, parentDomain);
-            await tx.wait();
-            fetchApprovedDomains();
-        } catch (err) {
-            handleError(err);
-            console.error(err);
-        }
-    };
 
-    const fetchApprovedDomains = async () => {
-        if (!contract) return;
-        try {
-            const domains = await contract.getDomains();
-            setApprovedDomains(domains);
-        } catch (err) {
-            console.error('Error fetching domains:', err);
-        }
-    };
 
 
     const base64UrlToHex = (n: string): `0x${string}` => {
@@ -207,13 +148,41 @@ const Admin = () => {
         }
     };
 
-    const handleAddDomain = () => {
-        addDomain(newDomain, Number(powerLevel), parentDomain);
-        setNewDomain('');
-        setParentDomain('');
-        setPowerLevel('1');
+    const handleBalanceTransfer = () => {
+        if (!contract) {
+            console.error('Contract not set');
+            return;
+        }
+
+        contract.withdrawFees()
+            .then((tx) => {
+                setBalance(0);
+            })
+            .catch((err) => {
+                console.error('Error withdrawing balance:', err);
+            });
     };
 
+
+    const getBalance = () => {
+        if (!contract) {
+            return;
+        }
+
+        contract.getContractBalance()
+            .then((balance) => {
+                setBalance(balance);
+            })
+            .catch((err) => {
+                console.error('Error fetching balance:', err);
+            });
+
+    }
+
+
+    useEffect(() => {
+        getBalance();
+    });
 
     return (<>
         <Box sx={{ textAlign: 'center', my: 2 }}>
@@ -232,42 +201,16 @@ const Admin = () => {
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
                 <TextField
-                    label="New Domain"
-                    value={newDomain}
-                    onChange={(e) => setNewDomain(e.target.value)}
-                    placeholder="e.g. studenti.unitn.it"
-                />
-                <TextField
-                    label="Parent Domain (optional)"
-                    value={parentDomain}
-                    onChange={(e) => setParentDomain(e.target.value)}
-                    placeholder="e.g. unitn.it"
-                />
-                <TextField
-                    label="Power Level"
-                    type="number"
-                    value={powerLevel}
-                    onChange={(e) => setPowerLevel(e.target.value)}
-                    slotProps={{ input: { min: "1" } }}
+                    label="Contract Balance"
+                    value={balance}
                 />
                 <Button
                     variant="contained"
-                    onClick={handleAddDomain}
-                    disabled={!newDomain || loading || !powerLevel}
+                    onClick={handleBalanceTransfer}
                 >
-                    Add Domain
+                    Widthdraw Balance
                 </Button>
             </Box>
-            <Typography variant="subtitle2">
-                Approved Domains:
-            </Typography>
-            <List>
-                {approvedDomains.map((domain, index) => (
-                    <ListItem key={index}>
-                        <ListItemText primary={domain} />
-                    </ListItem>
-                ))}
-            </List>
         </Paper>
     </>
     );

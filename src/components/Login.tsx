@@ -6,16 +6,20 @@ import { useEffect } from 'react';
 
 
 const Login = () => {
-  const { isRegistered, contract, jwt, isLoggedIn, loading, dispatch } = useVoting();
+
+  const { isRegistered, contract, jwt, isLoggedIn, loading, dispatch, account } = useVoting();
 
   const handleError = (err: any) => {
     dispatch({ type: 'SET_ERROR', payload: err });
   }
 
+  const setDomain = (domain: string) => {
+    dispatch({ type: 'SET_DOMAIN', payload: domain });
+  }
+  
   const setIsLoggedIn = (isLoggedIn: boolean) => {
     dispatch({ type: 'SET_IS_LOGGED_IN', payload: isLoggedIn });
   }
-
 
   function parseJwt(token: string) {
     return ({
@@ -28,12 +32,17 @@ const Login = () => {
 
   const handleRegister = async () => {
     if (isRegistered || !contract) { return; }
-
+            
     try {
       const { header, payload, hexSig } = parseJwt(jwt as string);
-      const tx = await contract.registerWithDomain(header, payload, hexSig);
-      await tx.wait();
+      
+      setDomain(JSON.parse(payload).email.split('@')[1]);
+      
+      await contract.registerWithDomain(header, payload, hexSig);
+      
       dispatch({ type: 'SET_IS_REGISTERED', payload: true });
+
+      setIsLoggedIn(true);
     } catch (err) {
       console.error('Registration error:', err);
       handleError('Failed to process request');
@@ -50,6 +59,7 @@ const Login = () => {
 
     try {
       const { header, payload, hexSig } = parseJwt(jwt as string);
+
       const tx = await contract.login(header, payload, hexSig);
       setIsLoggedIn(tx);
     } catch (err) {
@@ -59,16 +69,31 @@ const Login = () => {
       return;
     }
   };
-  
-  useEffect(() => {
-    if (isRegistered) {
-      dispatch({ type: 'SET_IS_REGISTERED', payload: true });
+
+
+    useEffect(() => {
+      checkUserRegistration();
+    }, [account, contract]);
+
+    const checkUserRegistration = async () => {
+        if (!contract) return;
+        
+        // Get the list of events with the VoterRegistered event so we can check if the user is registered
+        const voterRegisteredFilter = contract.filters.VoterRegistered()
+        const voterRegisteredEvents = await contract.queryFilter(voterRegisteredFilter)
+        
+        // Check if the user is registered
+        const isRegistered = voterRegisteredEvents.some((event: any) => {
+            const addresses: Array<string> = event.args?.map((address: string) => address.toLowerCase());
+            return addresses.includes(account);
+        });
+        // If the user is not registered, register them
+        dispatch({ type: 'SET_IS_REGISTERED', payload: isRegistered });
+
     }
-   }, [isRegistered, jwt]);
 
   return (
     <>
-  {isRegistered}
       {!isRegistered && jwt &&
         <Box sx={{ textAlign: 'center', my: 4 }}>
           <Typography variant="h6" gutterBottom>

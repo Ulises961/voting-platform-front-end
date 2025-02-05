@@ -13,7 +13,8 @@ const initialState: VotingState = {
     isLoggedIn: false,
     proposals: [],
     loading: false,
-    error: null
+    error: null,
+    domain: '',
 };
 
 const VotingContext = createContext<VotingContextType | undefined>(undefined);
@@ -40,6 +41,16 @@ function votingReducer(state: VotingState, action: VotingAction): VotingState {
             return { ...state, jwt: action.payload };
         case 'SET_IS_LOGGED_IN':
             return { ...state, isLoggedIn: action.payload };
+        case 'LOGOUT':
+            return {
+                ...state,
+                account: "",
+                jwt: null,
+                isLoggedIn: false,
+                isAdmin: false
+            };
+        case 'SET_DOMAIN':
+                return { ...state, domain: action.payload };    
         default:
             return state;
     }
