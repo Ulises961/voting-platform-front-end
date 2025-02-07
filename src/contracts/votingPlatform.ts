@@ -752,7 +752,7 @@ export const CONTRACT_ABI = [
         "type": "bool"
       }
     ],
-    "stateMutability": "view",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

@@ -1,6 +1,7 @@
 // VotingPlatform.tsx
 import { useState, useEffect } from 'react';
 import { Base64 } from 'js-base64';
+import { toast } from 'react-toastify';
 import {
     Button,
     TextField,
@@ -18,6 +19,7 @@ const Admin = () => {
     const { contract, account, dispatch } = useVoting();
     const [requiresUpdate, setRequiresUpdate] = useState<GoogleModule[]>([])
     const [balance, setBalance] = useState<number>(0);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
     const handleError = (err: any) => {
         dispatch({ type: 'SET_ERROR', payload: err });
@@ -148,21 +150,25 @@ const Admin = () => {
         }
     };
 
-    const handleBalanceTransfer = () => {
+    const handleBalanceTransfer = async () => {
         if (!contract) {
             console.error('Contract not set');
             return;
         }
-
-        contract.withdrawFees()
-            .then((tx) => {
-                setBalance(0);
-            })
-            .catch((err) => {
-                console.error('Error withdrawing balance:', err);
-            });
+    
+        try {
+            setIsLoading(true);
+            const tx = await contract.withdrawFees();
+            await tx.wait(); // Wait for transaction confirmation
+            setBalance(0);
+            toast.success('Balance withdrawn successfully');
+        } catch (err) {
+            console.error('Error withdrawing balance:', err);
+            toast.error('Failed to withdraw balance');
+        } finally {
+            setIsLoading(false);
+        }
     };
-
 
     const getBalance = () => {
         if (!contract) {
@@ -182,7 +188,7 @@ const Admin = () => {
 
     useEffect(() => {
         getBalance();
-    });
+    },[]);
 
     return (<>
         <Box sx={{ textAlign: 'center', my: 2 }}>
