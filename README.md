@@ -1,6 +1,4 @@
-# my-nextjs-app/README.md
-
-# My Next.js App
+# Voting Platform - Blockchain Final project
 
 This project is a Next.js application that allows users to create proposals and interact with IPFS and a smart contract. The application includes backend functions for posting validated and sanitized descriptions to IPFS and sending proposal data to the smart contract.
 
